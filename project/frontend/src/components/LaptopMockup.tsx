@@ -11,23 +11,20 @@ export const LaptopMockup: React.FC<LaptopMockupProps> = ({ imageUrl, isLoading 
       {/* Base laptop image */}
       <div className="relative">
         <img 
-          src="/How-to-Implement-DEI-Training-1024x563.jpeg"
+          src="/Lapi.png"
           alt="Laptop mockup"
           className="w-full h-auto"
         />
         
         {/* Overlay content on the laptop screen with your exact CSS positioning */}
         <div 
-          className="absolute flex items-center justify-center"
+          className="absolute flex items-center justify-center lapi-screen"
           style={{
-            width: '253px',
-            height: '149px',
-            left: '28.5%',
-            top: '17%'
+            
           }}
         >
           {isLoading ? (
-            <div className="w-full h-full bg-black bg-opacity-50 flex items-center justify-center rounded-[5px]">
+            <div className="w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
               <div className="flex flex-col items-center space-y-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
                 <p className="text-white text-sm font-medium">Processing...</p>
@@ -37,10 +34,10 @@ export const LaptopMockup: React.FC<LaptopMockupProps> = ({ imageUrl, isLoading 
             <img
               src={imageUrl}
               alt="Uploaded content"
-              className="w-full h-full object-cover rounded-[5px]"
+              className="w-full h-full object-contain"
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center rounded-[5px]">
+            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
               <div className="text-center text-gray-300">
                 <div className="w-12 h-12 mx-auto mb-3 opacity-70">
                   <svg viewBox="0 0 24 24" fill="currentColor">
