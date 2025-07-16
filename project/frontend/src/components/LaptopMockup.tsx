@@ -3,9 +3,10 @@ import React from 'react';
 interface LaptopMockupProps {
   imageUrl?: string;
   isLoading?: boolean;
+  dominantColor?: string;
 }
 
-export const LaptopMockup: React.FC<LaptopMockupProps> = ({ imageUrl, isLoading }) => {
+export const LaptopMockup: React.FC<LaptopMockupProps> = ({ imageUrl, isLoading, dominantColor }) => { // ✅ Used here
   return (
     <div className="relative max-w-2xl mx-auto">
       {/* Base laptop image */}
@@ -20,7 +21,7 @@ export const LaptopMockup: React.FC<LaptopMockupProps> = ({ imageUrl, isLoading 
         <div 
           className="absolute flex items-center justify-center lapi-screen"
           style={{
-            
+            backgroundColor: dominantColor || '#1a1a2e'
           }}
         >
           {isLoading ? (

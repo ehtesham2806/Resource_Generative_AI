@@ -24,6 +24,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 🔥 Utility function to extract dominant color
+def get_dominant_color(pil_image: Image.Image) -> str:
+    small_image = pil_image.resize((50, 50))
+    result = small_image.convert("RGB").getcolors(2500)
+    dominant_color = max(result, key=lambda x: x[0])[1]
+    return '#%02x%02x%02x' % dominant_color
+
 @app.get("/")
 async def root():
     return {"message": "PDF Image Extractor API is running"}
@@ -101,6 +108,9 @@ async def extract_pdf_image(file: UploadFile = File(...)):
             background.paste(pil_image, mask=pil_image.split()[-1] if pil_image.mode == "RGBA" else None)
             pil_image = background
         
+        # 🔥 Extract dominant color from the image
+        dominant_color = get_dominant_color(pil_image)
+        
         # Resize if image is too large (max width: 1200px)
         max_width = 1200
         if pil_image.width > max_width:
@@ -128,7 +138,8 @@ async def extract_pdf_image(file: UploadFile = File(...)):
             "image_size": {
                 "width": pil_image.width,
                 "height": pil_image.height
-            }
+            },
+            "dominant_color": dominant_color  # 🔥 Added here
         })
         
     except HTTPException:
@@ -178,6 +189,9 @@ async def process_image(file: UploadFile = File(...)):
             if pil_image.mode == "RGBA":
                 background.paste(pil_image, mask=pil_image.split()[-1])
                 pil_image = background
+
+        # 🔥 Extract dominant color from image
+        dominant_color = get_dominant_color(pil_image)
         
         # Resize if image is too large (max width: 1200px)
         max_width = 1200
@@ -205,7 +219,8 @@ async def process_image(file: UploadFile = File(...)):
             "image_size": {
                 "width": pil_image.width,
                 "height": pil_image.height
-            }
+            },
+            "dominant_color": dominant_color  # ✅ Added here only
         })
         
     except Exception as e:

@@ -6,6 +6,7 @@ import { processFile, checkBackendHealth } from './utils/fileProcessor';
 
 function App() {
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [dominantColor, setDominantColor] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState<string>('');
   const [error, setError] = useState<string>('');
@@ -26,27 +27,46 @@ function App() {
   }, []);
 
   const handleFileSelect = async (file: File) => {
-    setIsLoading(true);
-    setFileName(file.name);
-    setError('');
-    
-    try {
-      const processedImageUrl = await processFile(file);
-      setImageUrl(processedImageUrl);
-    } catch (error) {
-      console.error('Error processing file:', error);
-      setError(error instanceof Error ? error.message : 'Error processing file. Please try again.');
-      setImageUrl('');
-    } finally {
-      setIsLoading(false);
+  setIsLoading(true);
+  setFileName(file.name);
+  setError('');
+  setDominantColor('');
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const isPdf = file.type === "application/pdf";
+    const endpoint = isPdf ? "extract-pdf-image" : "process-image";
+
+    const res = await fetch(`http://localhost:8000/${endpoint}`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      setImageUrl(data.image_data);
+      setDominantColor(data.dominant_color || '#1a1a2e'); // <- ✅ set color here
+    } else {
+      throw new Error(data.detail || "Unknown error");
     }
-  };
+  } catch (error) {
+    console.error('Error processing file:', error);
+    setError(error instanceof Error ? error.message : 'Error processing file. Please try again.');
+    setImageUrl('');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handleReset = () => {
     setImageUrl('');
     setFileName('');
     setIsLoading(false);
     setError('');
+    setDominantColor(''); // ✅ RESET COLOR TOO
   };
 
   return (
@@ -201,7 +221,7 @@ function App() {
             </div>
             
             <div className="flex justify-center">
-              <LaptopMockup imageUrl={imageUrl} isLoading={isLoading} />
+              <LaptopMockup imageUrl={imageUrl} isLoading={isLoading} dominantColor={dominantColor} />
             </div>
             
             {imageUrl && !isLoading && (
