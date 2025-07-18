@@ -5,10 +5,11 @@ interface LaptopMockupProps {
   isLoading?: boolean;
   dominantColor?: string;
   objectFit?: 'contain' | 'cover';
+  coverPosition?: string;
 }
 
 export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
-  ({ imageUrl, isLoading, dominantColor, objectFit = 'contain' }, ref) => {
+  ({ imageUrl, isLoading, dominantColor, objectFit = 'contain', coverPosition = '0px' }, ref) => {
     return (
       <div ref={ref} className="relative max-w-2xl mx-auto">
         {/* Laptop base image */}
@@ -18,8 +19,8 @@ export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
           className="w-full h-auto"
         />
         
-        {/* Screen area - using your exact .lapi-screen class */}
-        <div className="absolute lapi-screen overflow-hidden flex items-center justify-center"
+        {/* Screen area */}
+        <div className="absolute lapi-screen overflow-hidden"
           style={{ backgroundColor: dominantColor || '#1a1a2e' }}>
           
           {isLoading ? (
@@ -31,9 +32,15 @@ export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
               <img
                 src={imageUrl}
                 alt="Display content"
-                className={`absolute inset-0 m-auto ${objectFit === 'contain' ? 
-                  'object-contain max-w-full max-h-full w-auto h-auto' : 
-                  'object-cover'}`}
+                className={`absolute left-0 right-0 mx-auto ${
+                  objectFit === 'contain' ? 
+                    'object-contain max-w-full max-h-full w-auto h-auto' : 
+                    'object-cover'
+                }`}
+                style={{
+                  top: objectFit === 'cover' ? coverPosition : '50%',
+                  transform: objectFit === 'contain' ? 'translateY(-50%)' : 'none'
+                }}
                 crossOrigin="anonymous"
               />
             </div>
