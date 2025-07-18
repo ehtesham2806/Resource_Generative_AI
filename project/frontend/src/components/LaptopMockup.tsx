@@ -1,57 +1,51 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 interface LaptopMockupProps {
   imageUrl?: string;
   isLoading?: boolean;
   dominantColor?: string;
+  objectFit?: 'contain' | 'cover';
 }
 
-export const LaptopMockup: React.FC<LaptopMockupProps> = ({ imageUrl, isLoading, dominantColor }) => { // ✅ Used here
-  return (
-    <div className="relative max-w-2xl mx-auto">
-      {/* Base laptop image */}
-      <div className="relative">
+export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
+  ({ imageUrl, isLoading, dominantColor, objectFit = 'contain' }, ref) => {
+    return (
+      <div ref={ref} className="relative max-w-2xl mx-auto">
+        {/* Laptop base image */}
         <img 
           src="/Lapi.png"
           alt="Laptop mockup"
           className="w-full h-auto"
         />
         
-        {/* Overlay content on the laptop screen with your exact CSS positioning */}
-        <div 
-          className="absolute flex items-center justify-center lapi-screen"
-          style={{
-            backgroundColor: dominantColor || '#1a1a2e'
-          }}
-        >
+        {/* Screen area - using your exact .lapi-screen class */}
+        <div className="absolute lapi-screen overflow-hidden flex items-center justify-center"
+          style={{ backgroundColor: dominantColor || '#1a1a2e' }}>
+          
           {isLoading ? (
-            <div className="w-full h-full bg-black bg-opacity-50 flex items-center justify-center">
-              <div className="flex flex-col items-center space-y-4">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                <p className="text-white text-sm font-medium">Processing...</p>
-              </div>
+            <div className="w-full h-full flex items-center justify-center bg-black bg-opacity-50">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
             </div>
           ) : imageUrl ? (
-            <img
-              src={imageUrl}
-              alt="Uploaded content"
-              className="w-full h-full object-contain"
-            />
+            <div className="relative w-full h-full">
+              <img
+                src={imageUrl}
+                alt="Display content"
+                className={`absolute inset-0 m-auto ${objectFit === 'contain' ? 
+                  'object-contain max-w-full max-h-full w-auto h-auto' : 
+                  'object-cover'}`}
+                crossOrigin="anonymous"
+              />
+            </div>
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-purple-900 flex items-center justify-center">
-              <div className="text-center text-gray-300">
-                <div className="w-12 h-12 mx-auto mb-3 opacity-70">
-                  <svg viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
-                  </svg>
-                </div>
-                <p className="text-xs font-medium">Upload content</p>
-                <p className="text-xs opacity-75 mt-1">Image or PDF</p>
-              </div>
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-900 to-purple-900">
+              {/* Default empty state */}
             </div>
           )}
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  }
+);
+
+LaptopMockup.displayName = 'LaptopMockup';

@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Monitor, Sparkles, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Monitor, Sparkles, RotateCcw, AlertCircle, CheckCircle, Download } from 'lucide-react';
 import { LaptopMockup } from './components/LaptopMockup';
 import { FileUpload } from './components/FileUpload';
-import { processFile, checkBackendHealth } from './utils/fileProcessor';
+import { checkBackendHealth } from './utils/fileProcessor';
+import html2canvas from 'html2canvas';
 
 function App() {
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -11,8 +12,10 @@ function App() {
   const [fileName, setFileName] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+  const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
+  const laptopMockupRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  // Check backend health on component mount
   useEffect(() => {
     const checkHealth = async () => {
       const isHealthy = await checkBackendHealth();
@@ -20,58 +23,118 @@ function App() {
     };
     
     checkHealth();
-    
-    // Check health every 30 seconds
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, []);
 
   const handleFileSelect = async (file: File) => {
-  setIsLoading(true);
-  setFileName(file.name);
-  setError('');
-  setDominantColor('');
+    setIsLoading(true);
+    setFileName(file.name);
+    setError('');
+    setDominantColor('');
 
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
 
-    const isPdf = file.type === "application/pdf";
-    const endpoint = isPdf ? "extract-pdf-image" : "process-image";
+      const isPdf = file.type === "application/pdf";
+      const endpoint = isPdf ? "extract-pdf-image" : "process-image";
 
-    const res = await fetch(`http://localhost:8000/${endpoint}`, {
-      method: "POST",
-      body: formData
-    });
+      const res = await fetch(`http://localhost:8000/${endpoint}`, {
+        method: "POST",
+        body: formData
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      setImageUrl(data.image_data);
-      setDominantColor(data.dominant_color || '#1a1a2e'); // <- ✅ set color here
-    } else {
-      throw new Error(data.detail || "Unknown error");
+      if (data.success) {
+        setImageUrl(data.image_data);
+        setDominantColor(data.dominant_color || '#1a1a2e');
+      } else {
+        throw new Error(data.detail || "Unknown error");
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      setError(error instanceof Error ? error.message : 'Error processing file. Please try again.');
+      setImageUrl('');
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    console.error('Error processing file:', error);
-    setError(error instanceof Error ? error.message : 'Error processing file. Please try again.');
-    setImageUrl('');
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleReset = () => {
     setImageUrl('');
     setFileName('');
     setIsLoading(false);
     setError('');
-    setDominantColor(''); // ✅ RESET COLOR TOO
+    setDominantColor('');
+  };
+
+  const handleDownload = async () => {
+    if (!laptopMockupRef.current || !imageUrl) return;
+
+    try {
+      setIsDownloading(true);
+      
+      // Create a temporary container outside the visible DOM
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.left = '-9999px';
+      document.body.appendChild(tempDiv);
+
+      // Clone the mockup without React state
+      const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
+      
+      // Remove any loading elements from the clone
+      const loadingElements = clone.querySelectorAll('.animate-spin');
+      loadingElements.forEach(el => el.remove());
+      
+      // Force display the image in the clone with proper type casting
+      const screenImg = clone.querySelector('.lapi-screen img') as HTMLImageElement | null;
+      if (screenImg) {
+        screenImg.style.display = 'block';
+      }
+
+      tempDiv.appendChild(clone);
+
+      // Wait for images to load
+      const images = clone.querySelectorAll('img');
+      await Promise.all(Array.from(images).map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
+      const canvas = await html2canvas(clone, {
+        backgroundColor: null,
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false
+      });
+
+      // Create and trigger download
+      const link = document.createElement('a');
+      link.download = `laptop-mockup-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      document.body.removeChild(tempDiv);
+    } catch (error) {
+      console.error('Download failed:', error);
+      setError('Download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-      {/* Backend Status Banner */}
       {backendStatus !== 'online' && (
         <div className={`w-full px-4 py-3 text-center text-sm font-medium ${
           backendStatus === 'checking' 
@@ -92,7 +155,6 @@ function App() {
         </div>
       )}
 
-      {/* Header */}
       <header className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -110,7 +172,6 @@ function App() {
               Transform your images and PDFs into stunning laptop displays with Python-powered PDF extraction
             </p>
             
-            {/* Backend Status Indicator */}
             <div className="mt-4 flex justify-center">
               <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
                 backendStatus === 'online' 
@@ -141,10 +202,8 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
         <div className="grid lg:grid-cols-2 gap-12 items-start">
-          {/* Upload Section */}
           <div className="space-y-8">
             <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
               <div className="mb-6">
@@ -187,7 +246,6 @@ function App() {
               )}
             </div>
 
-            {/* Features */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
@@ -211,7 +269,6 @@ function App() {
             </div>
           </div>
 
-          {/* Display Section */}
           <div className="space-y-8">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-gray-900 mb-4">Live Preview</h2>
@@ -221,22 +278,66 @@ function App() {
             </div>
             
             <div className="flex justify-center">
-              <LaptopMockup imageUrl={imageUrl} isLoading={isLoading} dominantColor={dominantColor} />
+              <LaptopMockup 
+                ref={laptopMockupRef}
+                imageUrl={imageUrl} 
+                isLoading={isLoading} 
+                dominantColor={dominantColor}
+                objectFit={objectFit}
+              />
             </div>
             
             {imageUrl && !isLoading && (
-              <div className="text-center">
-                <div className="inline-flex items-center space-x-2 bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-medium">
-                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Successfully processed and displayed</span>
+              <div className="flex flex-col items-center space-y-4">
+                <div className="flex items-center space-x-4 bg-white p-3 rounded-lg shadow-sm">
+                  <span className="text-sm font-medium text-gray-700">Image Fit:</span>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setObjectFit('contain')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        objectFit === 'contain'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Contain
+                    </button>
+                    <button
+                      onClick={() => setObjectFit('cover')}
+                      className={`px-3 py-1 text-sm rounded-md ${
+                        objectFit === 'cover'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      Cover
+                    </button>
+                  </div>
                 </div>
+
+                <button
+                  onClick={handleDownload}
+                  disabled={isLoading || isDownloading}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isDownloading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Preparing Download...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>Download Mockup</span>
+                    </>
+                  )}
+                </button>
               </div>
             )}
           </div>
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="bg-white border-t border-gray-200 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-500">
