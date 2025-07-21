@@ -6,10 +6,20 @@ interface LaptopMockupProps {
   dominantColor?: string;
   objectFit?: 'contain' | 'cover';
   coverPosition?: string;
+  coverLeft?: string;
+  coverScale?: number;
 }
 
 export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
-  ({ imageUrl, isLoading, dominantColor, objectFit = 'contain', coverPosition = '0px' }, ref) => {
+  ({
+    imageUrl,
+    isLoading,
+    dominantColor,
+    objectFit = 'contain',
+    coverPosition = '0px',
+    coverLeft = '0px',
+    coverScale = 1,
+  }, ref) => {
     return (
       <div ref={ref} className="relative max-w-2xl mx-auto">
         {/* Laptop base image */}
@@ -33,13 +43,17 @@ export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
                 src={imageUrl}
                 alt="Display content"
                 className={`absolute left-0 right-0 mx-auto ${
-                  objectFit === 'contain' ? 
-                    'object-contain max-w-full max-h-full w-auto h-auto' : 
-                    'object-cover'
+                  objectFit === 'contain'
+                    ? 'object-contain max-w-full max-h-full w-auto h-auto'
+                    : 'object-cover'
                 }`}
                 style={{
                   top: objectFit === 'cover' ? coverPosition : '50%',
-                  transform: objectFit === 'contain' ? 'translateY(-50%)' : 'none'
+                  left: objectFit === 'cover' ? coverLeft : '50%',
+                  transform:
+                    objectFit === 'contain'
+                      ? `translate(-50%, -50%) scale(${coverScale})`
+                      : `scale(${coverScale})`,
                 }}
                 crossOrigin="anonymous"
               />

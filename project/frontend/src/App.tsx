@@ -1,5 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { Monitor, Sparkles, RotateCcw, AlertCircle, CheckCircle, Download } from 'lucide-react';
+import {
+  Monitor,
+  Sparkles,
+  RotateCcw,
+  AlertCircle,
+  CheckCircle,
+  Download,
+} from 'lucide-react';
 import { LaptopMockup } from './components/LaptopMockup';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
@@ -16,6 +23,8 @@ function App() {
   const laptopMockupRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [coverPosition, setCoverPosition] = useState('0px');
+  const [coverLeft, setCoverLeft] = useState('0px'); // ✅ NEW
+  const [coverScale, setCoverScale] = useState(1.0);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -69,6 +78,7 @@ function App() {
     setIsLoading(false);
     setError('');
     setDominantColor('');
+    setCoverScale(1.0);
   };
 
   const handleDownload = async () => {
@@ -273,125 +283,210 @@ function App() {
                 See your content displayed on a realistic laptop mockup
               </p>
             </div>
-            
+
             <div className="flex justify-center">
-              <LaptopMockup 
+              <LaptopMockup
                 ref={laptopMockupRef}
-                imageUrl={imageUrl} 
-                isLoading={isLoading} 
+                imageUrl={imageUrl}
+                isLoading={isLoading}
                 dominantColor={dominantColor}
                 objectFit={objectFit}
                 coverPosition={coverPosition}
+                coverLeft={coverLeft}
+                coverScale={coverScale}
               />
             </div>
-            
+
             {imageUrl && !isLoading && (
-  <div className="flex flex-col items-center space-y-4">
-    <div className="w-full space-y-4">
-      <div className="flex items-center space-x-4 bg-white p-3 rounded-lg shadow-sm">
-        <span className="text-sm font-medium text-gray-700">Image Fit:</span>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => {
-              setObjectFit('contain');
-              setCoverPosition('0px'); // Reset position when switching to contain
-            }}
-            className={`px-3 py-1 text-sm rounded-md ${
-              objectFit === 'contain'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Contain
-          </button>
-          <button
-            onClick={() => setObjectFit('cover')}
-            className={`px-3 py-1 text-sm rounded-md ${
-              objectFit === 'cover'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Cover
-          </button>
-        </div>
-      </div>
+              <div className="flex flex-col items-center space-y-4">
+                <div className="w-full space-y-4">
+                  <div className="flex items-center space-x-4 bg-white p-3 rounded-lg shadow-sm">
+                    <span className="text-sm font-medium text-gray-700">Image Fit:</span>
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => {
+                          setObjectFit('contain');
+                          setCoverPosition('0px');
+                          setCoverLeft('0px'); // ✅ RESET horizontal position
+                        }}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          objectFit === 'contain'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Contain
+                      </button>
+                      <button
+                        onClick={() => setObjectFit('cover')}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          objectFit === 'cover'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        Cover
+                      </button>
+                    </div>
+                  </div>
 
-      {objectFit === 'cover' && (
-        <div className="bg-white p-3 rounded-lg shadow-sm">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Vertical Position:
-          </label>
-          <div className="flex items-center space-x-2">
-            <input
-              type="text"
-              value={coverPosition}
-              onChange={(e) => {
-                // Allow numbers, negative sign, and 'px'
-                const value = e.target.value;
-                if (/^-?\d*\.?\d*px?$/.test(value) || value === '') {
-                  setCoverPosition(value.includes('px') ? value : `${value}px`);
-                }
-              }}
-              onBlur={(e) => {
-                // Ensure valid format on blur
-                let value = e.target.value;
-                if (value === '') {
-                  value = '0px';
-                } else if (!value.endsWith('px')) {
-                  value = `${value}px`;
-                }
-                // Remove any non-numeric characters except - and .
-                const numericValue = value.replace(/[^\d.-]/g, '');
-                setCoverPosition(`${numericValue}px`);
-              }}
-              placeholder="e.g. 50px or -20px"
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            />
-            <button
-              onClick={() => {
-                // Parse current value and increment by 10px
-                const currentValue = parseInt(coverPosition) || 0;
-                setCoverPosition(`${currentValue + 10}px`);
-              }}
-              className="px-3 py-2 bg-gray-100 rounded-md"
-            >
-              +10
-            </button>
-            <button
-              onClick={() => {
-                // Parse current value and decrement by 10px
-                const currentValue = parseInt(coverPosition) || 0;
-                setCoverPosition(`${currentValue - 10}px`);
-              }}
-              className="px-3 py-2 bg-gray-100 rounded-md"
-            >
-              -10
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
+                  {objectFit === 'cover' && (
+                    <>
+                      {/* ✅ Vertical Position Input (unchanged) */}
+                      <div className="bg-white p-3 rounded-lg shadow-sm">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Vertical Position:
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={coverPosition}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (/^-?\d*\.?\d*px?$/.test(value) || value === '') {
+                                setCoverPosition(value.includes('px') ? value : `${value}px`);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              let value = e.target.value;
+                              if (value === '') value = '0px';
+                              else if (!value.endsWith('px')) value = `${value}px`;
+                              const numericValue = value.replace(/[^\d.-]/g, '');
+                              setCoverPosition(`${numericValue}px`);
+                            }}
+                            placeholder="e.g. 50px or -20px"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            onClick={() =>
+                              setCoverPosition(`${(parseInt(coverPosition) || 0) + 10}px`)
+                            }
+                            className="px-3 py-2 bg-gray-100 rounded-md"
+                          >
+                            +10
+                          </button>
+                          <button
+                            onClick={() =>
+                              setCoverPosition(`${(parseInt(coverPosition) || 0) - 10}px`)
+                            }
+                            className="px-3 py-2 bg-gray-100 rounded-md"
+                          >
+                            -10
+                          </button>
+                        </div>
+                      </div>
 
-    <button
-      onClick={handleDownload}
-      disabled={isLoading || isDownloading}
-      className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-    >
-      {isDownloading ? (
-        <div className="flex items-center space-x-2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-          <span>Preparing Download...</span>
-        </div>
-      ) : (
-        <>
-          <Download className="w-4 h-4" />
-          <span>Download Mockup</span>
-        </>
-      )}
-    </button>
-  </div>
-)}
+                      {/* ✅ Horizontal Position Input */}
+                      <div className="bg-white p-3 rounded-lg shadow-sm">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Horizontal Position:
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="text"
+                            value={coverLeft}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              if (/^-?\d*\.?\d*px?$/.test(value) || value === '') {
+                                setCoverLeft(value.includes('px') ? value : `${value}px`);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              let value = e.target.value;
+                              if (value === '') value = '0px';
+                              else if (!value.endsWith('px')) value = `${value}px`;
+                              const numericValue = value.replace(/[^\d.-]/g, '');
+                              setCoverLeft(`${numericValue}px`);
+                            }}
+                            placeholder="e.g. 30px or -15px"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          />
+                          <button
+                            onClick={() =>
+                              setCoverLeft(`${(parseInt(coverLeft) || 0) + 10}px`)
+                            }
+                            className="px-3 py-2 bg-gray-100 rounded-md"
+                          >
+                            +10
+                          </button>
+                          <button
+                            onClick={() =>
+                              setCoverLeft(`${(parseInt(coverLeft) || 0) - 10}px`)
+                            }
+                            className="px-3 py-2 bg-gray-100 rounded-md"
+                          >
+                            -10
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="my-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Zoom (Scale):
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            step={0.1}
+                            min={0}
+                            max={3}
+                            value={coverScale}
+                            onChange={(e) => {
+                              const value = parseFloat(e.target.value);
+                              if (!isNaN(value) && value >= 0 && value <= 3) {
+                                setCoverScale(parseFloat(value.toFixed(2)));
+                              }
+                            }}
+                            className="w-full px-3 py-2 border rounded-md"
+                            placeholder="e.g. 1"
+                          />
+                          <button
+                            onClick={() =>
+                              setCoverScale((prev) => {
+                                const next = parseFloat((prev + 0.1).toFixed(2));
+                                return next <= 3 ? next : prev;
+                              })
+                            }
+                            className="px-3 py-2 bg-gray-200 rounded-md"
+                          >
+                            +
+                          </button>
+                          <button
+                            onClick={() =>
+                              setCoverScale((prev) => {
+                                const next = parseFloat((prev - 0.1).toFixed(2));
+                                return next >= 0 ? next : prev;
+                              })
+                            }
+                            className="px-3 py-2 bg-gray-200 rounded-md"
+                          >
+                            -
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <button
+                  onClick={handleDownload}
+                  disabled={isLoading || isDownloading}
+                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isDownloading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Preparing Download...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      <span>Download Mockup</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>
