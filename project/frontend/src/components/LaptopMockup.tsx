@@ -8,6 +8,7 @@ interface LaptopMockupProps {
   coverPosition?: string;
   coverLeft?: string;
   coverScale?: number;
+  backgroundColor?: string;
 }
 
 export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
@@ -19,9 +20,10 @@ export const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
+    backgroundColor,
   }, ref) => {
     return (
-      <div ref={ref} className="relative max-w-2xl mx-auto">
+      <div ref={ref} className="relative max-w-2xl mx-auto laptop-main-div" style={{ backgroundColor: backgroundColor || '#f0f0f0' }}>
         {/* Laptop base image */}
         <img 
           src="/Lapi.png"

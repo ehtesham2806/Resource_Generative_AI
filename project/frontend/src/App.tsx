@@ -23,15 +23,18 @@ function App() {
   const laptopMockupRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [coverPosition, setCoverPosition] = useState('0px');
-  const [coverLeft, setCoverLeft] = useState('0px'); // ✅ NEW
+  const [coverLeft, setCoverLeft] = useState('0px');
   const [coverScale, setCoverScale] = useState(1.0);
+  const [outputWidth, setOutputWidth] = useState(1200);
+  const [outputHeight, setOutputHeight] = useState(800);
+  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
 
   useEffect(() => {
     const checkHealth = async () => {
       const isHealthy = await checkBackendHealth();
       setBackendStatus(isHealthy ? 'online' : 'offline');
     };
-    
+
     checkHealth();
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
@@ -79,6 +82,8 @@ function App() {
     setError('');
     setDominantColor('');
     setCoverScale(1.0);
+    setCoverPosition('0px');
+    setCoverLeft('0px');
   };
 
   const handleDownload = async () => {
@@ -86,7 +91,7 @@ function App() {
 
     try {
       setIsDownloading(true);
-      
+
       // Create a temporary container outside the visible DOM
       const tempDiv = document.createElement('div');
       tempDiv.style.position = 'fixed';
@@ -95,15 +100,19 @@ function App() {
 
       // Clone the mockup without React state
       const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
-      
+
       // Remove any loading elements from the clone
       const loadingElements = clone.querySelectorAll('.animate-spin');
       loadingElements.forEach(el => el.remove());
-      
+
       // Force display the image in the clone with proper type casting
       const screenImg = clone.querySelector('.lapi-screen img') as HTMLImageElement | null;
       if (screenImg) {
         screenImg.style.display = 'block';
+        // Apply scale only if objectFit is 'cover'
+        if (objectFit === 'cover') {
+          screenImg.style.transform = `scale(${coverScale})`;
+        }
       }
 
       tempDiv.appendChild(clone);
@@ -126,10 +135,35 @@ function App() {
         logging: false
       });
 
+      // Create a new canvas with the specified dimensions
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth;
+      finalCanvas.height = outputHeight;
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        // Fill with transparent background
+        ctx.clearRect(0, 0, outputWidth, outputHeight);
+
+        // Calculate scaling to fit the image within the specified dimensions
+        const scaleX = outputWidth / canvas.width;
+        const scaleY = outputHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
+
+        // Calculate centered position
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+        const x = (outputWidth - scaledWidth) / 2;
+        const y = (outputHeight - scaledHeight) / 2;
+
+        // Draw the scaled image centered in the final canvas
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
       // Create and trigger download
       const link = document.createElement('a');
       link.download = `laptop-mockup-${Date.now()}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/png');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -147,11 +181,10 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {backendStatus !== 'online' && (
-        <div className={`w-full px-4 py-3 text-center text-sm font-medium ${
-          backendStatus === 'checking' 
-            ? 'bg-yellow-100 text-yellow-800' 
+        <div className={`w-full px-4 py-3 text-center text-sm font-medium ${backendStatus === 'checking'
+            ? 'bg-yellow-100 text-yellow-800'
             : 'bg-red-100 text-red-800'
-        }`}>
+          }`}>
           {backendStatus === 'checking' ? (
             <div className="flex items-center justify-center space-x-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
@@ -180,13 +213,12 @@ function App() {
               <Sparkles className="w-6 h-6 text-purple-500 animate-pulse" />
             </div>
             <div className="mt-4 flex justify-center">
-              <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
-                backendStatus === 'online' 
-                  ? 'bg-green-100 text-green-800' 
+              <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${backendStatus === 'online'
+                  ? 'bg-green-100 text-green-800'
                   : backendStatus === 'checking'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-red-100 text-red-800'
+                }`}>
                 {backendStatus === 'online' ? (
                   <>
                     <CheckCircle className="w-4 h-4" />
@@ -208,7 +240,7 @@ function App() {
           </div>
         </div>
       </header>
-      <hr/>
+      <hr />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-5 mt-5">
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div className="space-y-8">
@@ -219,13 +251,13 @@ function App() {
                   Select an image or PDF file to display on the laptop screen
                 </p>
               </div>
-              
-              <FileUpload 
-                onFileSelect={handleFileSelect} 
-                isLoading={isLoading} 
+
+              <FileUpload
+                onFileSelect={handleFileSelect}
+                isLoading={isLoading}
                 disabled={backendStatus !== 'online'}
               />
-              
+
               {fileName && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center justify-between">
@@ -251,6 +283,66 @@ function App() {
                   <p className="text-sm text-red-800">{error}</p>
                 </div>
               )}
+
+              {/* Output Dimensions */}
+              <div className="mt-6 space-y-4">
+                <h3 className="text-lg font-semibold text-gray-900">Output Dimensions</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Width (px)
+                    </label>
+                    <input
+                      type="number"
+                      value={outputWidth}
+                      onChange={(e) => setOutputWidth(parseInt(e.target.value) || 1200)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="1200"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Height (px)
+                    </label>
+                    <input
+                      type="number"
+                      value={outputHeight}
+                      onChange={(e) => setOutputHeight(parseInt(e.target.value) || 800)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="800"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  Set the width and height for the downloaded mockup image (will be scaled to fit)
+                </p>
+              </div>
+              <div className="my-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Background Color:
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="color"
+                    value={backgroundColor}
+                    onChange={(e) => setBackgroundColor(e.target.value)}
+                    className="w-10 h-10 p-0 border rounded"
+                    title="Choose color"
+                  />
+                  <input
+                    type="text"
+                    value={backgroundColor}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(val) || val === '') {
+                        setBackgroundColor(val);
+                      }
+                    }}
+                    placeholder="#ffffff"
+                    className="px-3 py-2 border rounded-md w-full"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -263,7 +355,7 @@ function App() {
                   Upload JPG, PNG, GIF with Python-powered optimization
                 </p>
               </div>
-              
+
               <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
                 <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
                   <span className="text-2xl">📄</span>
@@ -278,7 +370,8 @@ function App() {
 
           <div className="space-y-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Live Preview</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Livekarang
+                Live Preview</h2>
               <p className="text-gray-600 mb-8">
                 See your content displayed on a realistic laptop mockup
               </p>
@@ -293,7 +386,8 @@ function App() {
                 objectFit={objectFit}
                 coverPosition={coverPosition}
                 coverLeft={coverLeft}
-                coverScale={coverScale}
+                coverScale={objectFit === 'cover' ? coverScale : 1.0}
+                backgroundColor={backgroundColor}
               />
             </div>
 
@@ -307,23 +401,22 @@ function App() {
                         onClick={() => {
                           setObjectFit('contain');
                           setCoverPosition('0px');
-                          setCoverLeft('0px'); // ✅ RESET horizontal position
+                          setCoverLeft('0px');
+                          setCoverScale(1.0);
                         }}
-                        className={`px-3 py-1 text-sm rounded-md ${
-                          objectFit === 'contain'
+                        className={`px-3 py-1 text-sm rounded-md ${objectFit === 'contain'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                          }`}
                       >
                         Contain
                       </button>
                       <button
                         onClick={() => setObjectFit('cover')}
-                        className={`px-3 py-1 text-sm rounded-md ${
-                          objectFit === 'cover'
+                        className={`px-3 py-1 text-sm rounded-md ${objectFit === 'cover'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
+                          }`}
                       >
                         Cover
                       </button>
@@ -332,7 +425,7 @@ function App() {
 
                   {objectFit === 'cover' && (
                     <>
-                      {/* ✅ Vertical Position Input (unchanged) */}
+                      {/* Vertical Position Input */}
                       <div className="bg-white p-3 rounded-lg shadow-sm">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Vertical Position:
@@ -376,7 +469,7 @@ function App() {
                         </div>
                       </div>
 
-                      {/* ✅ Horizontal Position Input */}
+                      {/* Horizontal Position Input */}
                       <div className="bg-white p-3 rounded-lg shadow-sm">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Horizontal Position:
@@ -494,7 +587,7 @@ function App() {
       <footer className="bg-white border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-500">
-            <p>&copy; 2025 AI Display Studio. Powered by Python + React architecture.</p>
+            <p>© 2025 AI Display Studio. Powered by Python + React architecture.</p>
           </div>
         </div>
       </footer>
