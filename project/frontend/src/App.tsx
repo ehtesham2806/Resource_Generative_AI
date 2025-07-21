@@ -157,8 +157,8 @@ function App() {
       )}
 
       <header className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/10 to-purple-600/10"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="absolute inset-0"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="text-center">
             <div className="flex justify-center items-center space-x-3 mb-6">
               <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-lg">
@@ -169,10 +169,6 @@ function App() {
               </h1>
               <Sparkles className="w-6 h-6 text-purple-500 animate-pulse" />
             </div>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              Transform your images and PDFs into stunning laptop displays with Python-powered PDF extraction
-            </p>
-            
             <div className="mt-4 flex justify-center">
               <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
                 backendStatus === 'online' 
@@ -202,8 +198,8 @@ function App() {
           </div>
         </div>
       </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
+      <hr/>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-5 mt-5">
         <div className="grid lg:grid-cols-2 gap-12 items-start">
           <div className="space-y-8">
             <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
@@ -400,7 +396,7 @@ function App() {
         </div>
       </main>
 
-      <footer className="bg-white border-t border-gray-200 mt-16">
+      <footer className="bg-white border-t border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center text-gray-500">
             <p>&copy; 2025 AI Display Studio. Powered by Python + React architecture.</p>
