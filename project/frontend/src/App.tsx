@@ -7,7 +7,8 @@ import {
   CheckCircle,
   Download,
 } from 'lucide-react';
-import { LaptopMockup } from './components/LaptopMockup';
+import LaptopMockup from './components/LaptopMockup.tsx';
+import BookMockup from './components/BookMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import html2canvas from 'html2canvas';
@@ -15,19 +16,21 @@ import html2canvas from 'html2canvas';
 function App() {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [dominantColor, setDominantColor] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
   const laptopMockupRef = useRef<HTMLDivElement>(null);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [coverPosition, setCoverPosition] = useState('0px');
-  const [coverLeft, setCoverLeft] = useState('0px');
-  const [coverScale, setCoverScale] = useState(1.0);
-  const [outputWidth, setOutputWidth] = useState(1200);
-  const [outputHeight, setOutputHeight] = useState(800);
-  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
+  const bookMockupRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
+  const [coverPosition, setCoverPosition] = useState<string>('0px');
+  const [coverLeft, setCoverLeft] = useState<string>('0px');
+  const [coverScale, setCoverScale] = useState<number>(1.0);
+  const [outputWidth, setOutputWidth] = useState<number>(1200);
+  const [outputHeight, setOutputHeight] = useState<number>(800);
+  const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
+  const [mockupTemplate, setMockupTemplate] = useState<string>('laptop');
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -48,14 +51,14 @@ function App() {
 
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append('file', file);
 
-      const isPdf = file.type === "application/pdf";
-      const endpoint = isPdf ? "extract-pdf-image" : "process-image";
+      const isPdf = file.type === 'application/pdf';
+      const endpoint = isPdf ? 'extract-pdf-image' : 'process-image';
 
       const res = await fetch(`http://localhost:8000/${endpoint}`, {
-        method: "POST",
-        body: formData
+        method: 'POST',
+        body: formData,
       });
 
       const data = await res.json();
@@ -64,7 +67,7 @@ function App() {
         setImageUrl(data.image_data);
         setDominantColor(data.dominant_color || '#1a1a2e');
       } else {
-        throw new Error(data.detail || "Unknown error");
+        throw new Error(data.detail || 'Unknown error');
       }
     } catch (error) {
       console.error('Error processing file:', error);
@@ -87,39 +90,40 @@ function App() {
   };
 
   const handleDownload = async () => {
-    if (!laptopMockupRef.current || !imageUrl) return;
+    const mockupRef = mockupTemplate === 'laptop' ? laptopMockupRef : bookMockupRef;
+    if (!mockupRef.current || !imageUrl) return;
 
     try {
       setIsDownloading(true);
 
-      // Create a temporary container outside the visible DOM
       const tempDiv = document.createElement('div');
       tempDiv.style.position = 'fixed';
       tempDiv.style.left = '-9999px';
       document.body.appendChild(tempDiv);
 
-      // Clone the mockup without React state
-      const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
+      const clone = mockupRef.current.cloneNode(true) as HTMLElement;
 
-      // Remove any loading elements from the clone
       const loadingElements = clone.querySelectorAll('.animate-spin');
-      loadingElements.forEach(el => el.remove());
+      loadingElements.forEach((el: Element) => el.remove());
 
-      // Force display the image in the clone with proper type casting
-      const screenImg = clone.querySelector('.lapi-screen img') as HTMLImageElement | null;
+      const screenImg = clone.querySelector(mockupTemplate === 'laptop' ? '.lapi-screen img' : '.book-cover img') as HTMLImageElement | null;
       if (screenImg) {
         screenImg.style.display = 'block';
-        // Apply scale only if objectFit is 'cover'
         if (objectFit === 'cover') {
           screenImg.style.transform = `scale(${coverScale})`;
+          screenImg.style.top = coverPosition;
+          screenImg.style.left = coverLeft;
+        } else {
+          screenImg.style.transform = `translate(-50%, -50%) scale(${coverScale})`;
+          screenImg.style.top = '50%';
+          screenImg.style.left = '50%';
         }
       }
 
       tempDiv.appendChild(clone);
 
-      // Wait for images to load
-      const images = clone.querySelectorAll('img');
-      await Promise.all(Array.from(images).map(img => {
+      const images = clone.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
+      await Promise.all(Array.from(images).map((img: HTMLImageElement) => {
         if (img.complete) return Promise.resolve();
         return new Promise((resolve) => {
           img.onload = resolve;
@@ -132,43 +136,33 @@ function App() {
         scale: 2,
         useCORS: true,
         allowTaint: true,
-        logging: false
+        logging: false,
       });
 
-      // Create a new canvas with the specified dimensions
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = outputWidth;
       finalCanvas.height = outputHeight;
       const ctx = finalCanvas.getContext('2d');
 
       if (ctx) {
-        // Fill with transparent background
         ctx.clearRect(0, 0, outputWidth, outputHeight);
-
-        // Calculate scaling to fit the image within the specified dimensions
         const scaleX = outputWidth / canvas.width;
         const scaleY = outputHeight / canvas.height;
-        const scale = Math.min(scaleX, scaleY); // Use the smaller scale to maintain aspect ratio
-
-        // Calculate centered position
+        const scale = Math.min(scaleX, scaleY);
         const scaledWidth = canvas.width * scale;
         const scaledHeight = canvas.height * scale;
         const x = (outputWidth - scaledWidth) / 2;
         const y = (outputHeight - scaledHeight) / 2;
-
-        // Draw the scaled image centered in the final canvas
         ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
       }
 
-      // Create and trigger download
       const link = document.createElement('a');
-      link.download = `laptop-mockup-${Date.now()}.png`;
+      link.download = `${mockupTemplate}-mockup-${Date.now()}.png`;
       link.href = finalCanvas.toDataURL('image/png');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
 
-      // Cleanup
       document.body.removeChild(tempDiv);
     } catch (error) {
       console.error('Download failed:', error);
@@ -181,10 +175,11 @@ function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {backendStatus !== 'online' && (
-        <div className={`w-full px-4 py-3 text-center text-sm font-medium ${backendStatus === 'checking'
-            ? 'bg-yellow-100 text-yellow-800'
-            : 'bg-red-100 text-red-800'
-          }`}>
+        <div
+          className={`w-full px-4 py-3 text-center text-sm font-medium ${
+            backendStatus === 'checking' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+          }`}
+        >
           {backendStatus === 'checking' ? (
             <div className="flex items-center justify-center space-x-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
@@ -193,7 +188,10 @@ function App() {
           ) : (
             <div className="flex items-center justify-center space-x-2">
               <AlertCircle className="w-4 h-4" />
-              <span>Backend server is offline. Please start the Python server: <code className="bg-red-200 px-1 rounded">cd backend && python run.py</code></span>
+              <span>
+                Backend server is offline. Please start the Python server:{' '}
+                <code className="bg-red-200 px-1 rounded">cd backend && python run.py</code>
+              </span>
             </div>
           )}
         </div>
@@ -213,12 +211,15 @@ function App() {
               <Sparkles className="w-6 h-6 text-purple-500 animate-pulse" />
             </div>
             <div className="mt-4 flex justify-center">
-              <div className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${backendStatus === 'online'
-                  ? 'bg-green-100 text-green-800'
-                  : backendStatus === 'checking'
+              <div
+                className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
+                  backendStatus === 'online'
+                    ? 'bg-green-100 text-green-800'
+                    : backendStatus === 'checking'
                     ? 'bg-yellow-100 text-yellow-800'
                     : 'bg-red-100 text-red-800'
-                }`}>
+                }`}
+              >
                 {backendStatus === 'online' ? (
                   <>
                     <CheckCircle className="w-4 h-4" />
@@ -247,25 +248,17 @@ function App() {
             <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Your Content</h2>
-                <p className="text-gray-600">
-                  Select an image or PDF file to display on the laptop screen
-                </p>
+                <p className="text-gray-600">Select an image or PDF file to display on the selected mockup</p>
               </div>
 
-              <FileUpload
-                onFileSelect={handleFileSelect}
-                isLoading={isLoading}
-                disabled={backendStatus !== 'online'}
-              />
+              <FileUpload onFileSelect={handleFileSelect} isLoading={isLoading} disabled={backendStatus !== 'online'} />
 
               {fileName && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium text-blue-900">
-                        {fileName}
-                      </span>
+                      <span className="text-sm font-medium text-blue-900">{fileName}</span>
                     </div>
                     <button
                       onClick={handleReset}
@@ -284,14 +277,11 @@ function App() {
                 </div>
               )}
 
-              {/* Output Dimensions */}
               <div className="mt-6 space-y-4">
                 <h3 className="text-lg font-semibold text-gray-900">Output Dimensions</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Width (px)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Width (px)</label>
                     <input
                       type="number"
                       value={outputWidth}
@@ -301,9 +291,7 @@ function App() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Height (px)
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Height (px)</label>
                     <input
                       type="number"
                       value={outputHeight}
@@ -325,9 +313,7 @@ function App() {
                   <span className="text-2xl">🖼️</span>
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">Image Processing</h3>
-                <p className="text-sm text-gray-600">
-                  Upload JPG, PNG, GIF with Python-powered optimization
-                </p>
+                <p className="text-sm text-gray-600">Upload JPG, PNG, GIF with Python-powered optimization</p>
               </div>
 
               <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
@@ -335,43 +321,61 @@ function App() {
                   <span className="text-2xl">📄</span>
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">PDF Extraction</h3>
-                <p className="text-sm text-gray-600">
-                  High-quality first page extraction using PyMuPDF
-                </p>
+                <p className="text-sm text-gray-600">High-quality first page extraction using PyMuPDF</p>
               </div>
             </div>
           </div>
 
           <div className="space-y-8">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Livekarang
-                Live Preview</h2>
-              <p className="text-gray-600 mb-8">
-                See your content displayed on a realistic laptop mockup
-              </p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4">Live Preview</h2>
+              <p className="text-gray-600 mb-8">See your content displayed on a realistic mockup</p>
+            </div>
+
+            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mockup Template</label>
+              <select
+                value={mockupTemplate}
+                onChange={(e) => setMockupTemplate(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="laptop">Laptop Mockup</option>
+                <option value="book">Book Mockup</option>
+              </select>
             </div>
 
             <div className="flex justify-center">
-              <LaptopMockup
-                ref={laptopMockupRef}
-                imageUrl={imageUrl}
-                isLoading={isLoading}
-                dominantColor={dominantColor}
-                objectFit={objectFit}
-                coverPosition={coverPosition}
-                coverLeft={coverLeft}
-                coverScale={objectFit === 'cover' ? coverScale : 1.0}
-                backgroundColor={backgroundColor}
-              />
+              {mockupTemplate === 'laptop' ? (
+                <LaptopMockup
+                  ref={laptopMockupRef}
+                  imageUrl={imageUrl}
+                  isLoading={isLoading}
+                  dominantColor={dominantColor}
+                  objectFit={objectFit}
+                  coverPosition={coverPosition}
+                  coverLeft={coverLeft}
+                  coverScale={objectFit === 'cover' ? coverScale : 1.0}
+                  backgroundColor={backgroundColor}
+                />
+              ) : (
+                <BookMockup
+                  ref={bookMockupRef}
+                  imageUrl={imageUrl}
+                  isLoading={isLoading}
+                  backgroundColor={backgroundColor}
+                  objectFit={objectFit}
+                  coverPosition={coverPosition}
+                  coverLeft={coverLeft}
+                  coverScale={objectFit === 'cover' ? coverScale : 1.0}
+                />
+              )}
             </div>
 
             {imageUrl && !isLoading && (
               <div className="flex flex-col items-center space-y-4">
                 <div className="w-full space-y-4">
                   <div className="my-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Background Color:
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Background Color:</label>
                     <div className="flex items-center space-x-2">
                       <input
                         type="color"
@@ -394,6 +398,7 @@ function App() {
                       />
                     </div>
                   </div>
+
                   <div className="flex items-center space-x-4 bg-white p-3 rounded-lg shadow-sm">
                     <span className="text-sm font-medium text-gray-700">Image Fit:</span>
                     <div className="flex space-x-2">
@@ -404,19 +409,19 @@ function App() {
                           setCoverLeft('0px');
                           setCoverScale(1.0);
                         }}
-                        className={`px-3 py-1 text-sm rounded-md ${objectFit === 'contain'
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          objectFit === 'contain'
                             ? 'bg-blue-600 text-white'
                             : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
+                        }`}
                       >
                         Contain
                       </button>
                       <button
                         onClick={() => setObjectFit('cover')}
-                        className={`px-3 py-1 text-sm rounded-md ${objectFit === 'cover'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          objectFit === 'cover' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
                       >
                         Cover
                       </button>
@@ -425,11 +430,8 @@ function App() {
 
                   {objectFit === 'cover' && (
                     <>
-                      {/* Vertical Position Input */}
                       <div className="bg-white p-3 rounded-lg shadow-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Vertical Position:
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Vertical Position:</label>
                         <div className="flex items-center space-x-2">
                           <input
                             type="text"
@@ -451,17 +453,13 @@ function App() {
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                           />
                           <button
-                            onClick={() =>
-                              setCoverPosition(`${(parseInt(coverPosition) || 0) + 10}px`)
-                            }
+                            onClick={() => setCoverPosition(`${(parseInt(coverPosition) || 0) + 10}px`)}
                             className="px-3 py-2 bg-gray-100 rounded-md"
                           >
                             +10
                           </button>
                           <button
-                            onClick={() =>
-                              setCoverPosition(`${(parseInt(coverPosition) || 0) - 10}px`)
-                            }
+                            onClick={() => setCoverPosition(`${(parseInt(coverPosition) || 0) - 10}px`)}
                             className="px-3 py-2 bg-gray-100 rounded-md"
                           >
                             -10
@@ -469,11 +467,8 @@ function App() {
                         </div>
                       </div>
 
-                      {/* Horizontal Position Input */}
                       <div className="bg-white p-3 rounded-lg shadow-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Horizontal Position:
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Horizontal Position:</label>
                         <div className="flex items-center space-x-2">
                           <input
                             type="text"
@@ -495,17 +490,13 @@ function App() {
                             className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                           />
                           <button
-                            onClick={() =>
-                              setCoverLeft(`${(parseInt(coverLeft) || 0) + 10}px`)
-                            }
+                            onClick={() => setCoverLeft(`${(parseInt(coverLeft) || 0) + 10}px`)}
                             className="px-3 py-2 bg-gray-100 rounded-md"
                           >
                             +10
                           </button>
                           <button
-                            onClick={() =>
-                              setCoverLeft(`${(parseInt(coverLeft) || 0) - 10}px`)
-                            }
+                            onClick={() => setCoverLeft(`${(parseInt(coverLeft) || 0) - 10}px`)}
                             className="px-3 py-2 bg-gray-100 rounded-md"
                           >
                             -10
@@ -514,9 +505,7 @@ function App() {
                       </div>
 
                       <div className="bg-white p-3 rounded-lg shadow-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Zoom (Scale):
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Zoom (Scale):</label>
                         <div className="flex items-center space-x-2">
                           <input
                             type="number"

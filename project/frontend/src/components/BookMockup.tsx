@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
+import '../assets/BookMockup.css';
 
-interface LaptopMockupProps {
+interface BookMockupProps {
   imageUrl?: string;
   isLoading?: boolean;
   dominantColor?: string;
@@ -11,7 +12,7 @@ interface LaptopMockupProps {
   backgroundColor?: string;
 }
 
-const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
+const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
   ({
     imageUrl,
     isLoading,
@@ -25,20 +26,20 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
     return (
       <div
         ref={ref}
-        className="relative max-w-2xl mx-auto laptop-main-div"
+        className="relative max-w-2xl mx-auto book-main-div"
         style={{ backgroundColor: backgroundColor || '#f0f0f0' }}
       >
-        {/* Laptop base image */}
+        {/* Book base image */}
         <img
-          src="/Lapi.png"
-          alt="Laptop mockup"
+          src="/Book.png"
+          alt="Book mockup"
           className="w-full h-auto"
         />
 
-        {/* Screen area */}
+        {/* Cover area */}
         <div
-          className="absolute lapi-screen overflow-hidden"
-          style={{ backgroundColor: dominantColor || '#1a1a2e' }}
+          className="absolute book-cover overflow-hidden"
+          style={{ backgroundColor: dominantColor || '#ffffff' }}
         >
           {isLoading ? (
             <div className="w-full h-full flex items-center justify-center bg-black bg-opacity-50">
@@ -48,7 +49,7 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
             <div className="relative w-full h-full">
               <img
                 src={imageUrl}
-                alt="Display content"
+                alt="Book cover content"
                 className={`absolute left-0 right-0 mx-auto ${
                   objectFit === 'contain'
                     ? 'object-contain max-w-full max-h-full w-auto h-auto'
@@ -76,6 +77,6 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
   }
 );
 
-LaptopMockup.displayName = 'LaptopMockup';
+BookMockup.displayName = 'BookMockup';
 
-export default LaptopMockup;
+export default BookMockup;

@@ -1,0 +1,38 @@
+/* assets/BookMockup.css */
+.book-main-div {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    /* Adjust based on Book.png dimensions */
+    aspect-ratio: 3 / 2;
+    /* Adjust based on Book.png aspect ratio */
+
+    perspective: 1000px;
+}
+
+.book-main-div img {
+    width: auto;
+    height: 400px;
+    display: block;
+    margin: auto;
+}
+
+.book-cover {
+    position: absolute;
+    top: 4.9%;
+    left: 27%;
+    width: 38.9%;
+    height: 88.1%;
+    overflow: hidden;
+    border-radius: 4px;
+
+    transform-style: preserve-3d;
+    transform: rotateY(-17deg);
+
+    /* transform: perspective(980px) rotateY(-15deg) rotate(0deg);
+    transform-origin: bottom left; */
+}
+.book-cover img {
+    /* transform: rotate(0deg) rotateY(-39deg);
+    transform-origin: bottom left; */
+}
