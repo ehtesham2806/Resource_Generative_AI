@@ -24,6 +24,8 @@ A full-stack application that transforms images and PDFs into stunning laptop di
 cd backend
 
 # Install Python dependencies
+python -m venv venv
+venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 
 # Start the FastAPI server
