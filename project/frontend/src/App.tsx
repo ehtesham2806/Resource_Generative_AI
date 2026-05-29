@@ -12,6 +12,7 @@ import BookMockup from './components/BookMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import html2canvas from 'html2canvas';
+import * as htmlToImage from 'html-to-image';
 
 function App() {
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -90,87 +91,204 @@ function App() {
   };
 
   const handleDownload = async () => {
-    const mockupRef = mockupTemplate === 'laptop' ? laptopMockupRef : bookMockupRef;
-    if (!mockupRef.current || !imageUrl) return;
+  if (mockupTemplate === 'laptop') {
+    await downloadLaptopMockup();
+  } else {
+    await downloadBookMockup();
+  }
+};
 
-    try {
-      setIsDownloading(true);
 
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.left = '-9999px';
-      document.body.appendChild(tempDiv);
 
-      const clone = mockupRef.current.cloneNode(true) as HTMLElement;
+// ==============================
+// LAPTOP MOCKUP (html2canvas)
+// ==============================
+const downloadLaptopMockup = async () => {
+  if (!laptopMockupRef.current || !imageUrl) return;
 
-      const loadingElements = clone.querySelectorAll('.animate-spin');
-      loadingElements.forEach((el: Element) => el.remove());
+  try {
+    setIsDownloading(true);
 
-      const screenImg = clone.querySelector(mockupTemplate === 'laptop' ? '.lapi-screen img' : '.book-cover img') as HTMLImageElement | null;
-      if (screenImg) {
-        screenImg.style.display = 'block';
-        if (objectFit === 'cover') {
-          screenImg.style.transform = `scale(${coverScale})`;
-          screenImg.style.top = coverPosition;
-          screenImg.style.left = coverLeft;
-        } else {
-          screenImg.style.transform = `translate(-50%, -50%) scale(${coverScale})`;
-          screenImg.style.top = '50%';
-          screenImg.style.left = '50%';
-        }
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'fixed';
+    tempDiv.style.left = '-9999px';
+    tempDiv.style.top = '0';
+    document.body.appendChild(tempDiv);
+
+    const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
+
+    // Remove loading animations
+    const loadingElements = clone.querySelectorAll('.animate-spin');
+    loadingElements.forEach((el) => el.remove());
+
+    // Fix laptop screen image
+    const screenImg = clone.querySelector(
+      '.lapi-screen img'
+    ) as HTMLImageElement | null;
+
+    if (screenImg) {
+      screenImg.style.display = 'block';
+
+      if (objectFit === 'cover') {
+        screenImg.style.transform = `scale(${coverScale})`;
+        screenImg.style.top = coverPosition;
+        screenImg.style.left = coverLeft;
+      } else {
+        screenImg.style.transform = `translate(-50%, -50%) scale(${coverScale})`;
+        screenImg.style.top = '50%';
+        screenImg.style.left = '50%';
       }
+    }
 
-      tempDiv.appendChild(clone);
+    tempDiv.appendChild(clone);
 
-      const images = clone.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
-      await Promise.all(Array.from(images).map((img: HTMLImageElement) => {
+    // Wait for images
+    const images = clone.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
+
+    await Promise.all(
+      Array.from(images).map((img) => {
         if (img.complete) return Promise.resolve();
+
         return new Promise((resolve) => {
           img.onload = resolve;
           img.onerror = resolve;
         });
-      }));
+      })
+    );
 
-      const canvas = await html2canvas(clone, {
-        backgroundColor: null,
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-      });
+    // Render
+    const canvas = await html2canvas(clone, {
+      backgroundColor: null,
+      scale: 3,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+    });
 
-      const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outputWidth;
-      finalCanvas.height = outputHeight;
-      const ctx = finalCanvas.getContext('2d');
+    // Final output
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = outputWidth;
+    finalCanvas.height = outputHeight;
 
-      if (ctx) {
-        ctx.clearRect(0, 0, outputWidth, outputHeight);
-        const scaleX = outputWidth / canvas.width;
-        const scaleY = outputHeight / canvas.height;
-        const scale = Math.min(scaleX, scaleY);
-        const scaledWidth = canvas.width * scale;
-        const scaledHeight = canvas.height * scale;
-        const x = (outputWidth - scaledWidth) / 2;
-        const y = (outputHeight - scaledHeight) / 2;
-        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
-      }
+    const ctx = finalCanvas.getContext('2d');
 
-      const link = document.createElement('a');
-      link.download = `${mockupTemplate}-mockup-${Date.now()}.png`;
-      link.href = finalCanvas.toDataURL('image/png');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
-      document.body.removeChild(tempDiv);
-    } catch (error) {
-      console.error('Download failed:', error);
-      setError('Download failed. Please try again.');
-    } finally {
-      setIsDownloading(false);
+      ctx.clearRect(0, 0, outputWidth, outputHeight);
+
+      const scaleX = outputWidth / canvas.width;
+      const scaleY = outputHeight / canvas.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      const scaledWidth = canvas.width * scale;
+      const scaledHeight = canvas.height * scale;
+
+      const x = (outputWidth - scaledWidth) / 2;
+      const y = (outputHeight - scaledHeight) / 2;
+
+      ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
     }
-  };
+
+    const link = document.createElement('a');
+    link.download = `laptop-mockup-${Date.now()}.png`;
+    link.href = finalCanvas.toDataURL('image/png');
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    document.body.removeChild(tempDiv);
+  } catch (error) {
+    console.error('Laptop download failed:', error);
+    setError('Laptop download failed. Please try again.');
+  } finally {
+    setIsDownloading(false);
+  }
+};
+
+
+
+// ==============================
+// BOOK MOCKUP (html-to-image)
+// ==============================
+const downloadBookMockup = async () => {
+  if (!bookMockupRef.current || !imageUrl) return;
+
+  try {
+    setIsDownloading(true);
+
+    // Wait for images
+    const images = bookMockupRef.current.querySelectorAll(
+      'img'
+    ) as NodeListOf<HTMLImageElement>;
+
+    await Promise.all(
+      Array.from(images).map((img) => {
+        if (img.complete) return Promise.resolve();
+
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    );
+
+    // Render using html-to-image
+    const canvas = await htmlToImage.toCanvas(bookMockupRef.current, {
+      backgroundColor: undefined,
+      pixelRatio: 2,
+
+      filter: (element) => {
+        if (element instanceof HTMLElement) {
+          return !element.classList.contains('animate-spin');
+        }
+
+        return true;
+      },
+    });
+
+    // Final output
+    const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = outputWidth;
+    finalCanvas.height = outputHeight;
+
+    const ctx = finalCanvas.getContext('2d');
+
+    if (ctx) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+
+      ctx.clearRect(0, 0, outputWidth, outputHeight);
+
+      const scaleX = outputWidth / canvas.width;
+      const scaleY = outputHeight / canvas.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      const scaledWidth = canvas.width * scale;
+      const scaledHeight = canvas.height * scale;
+
+      const x = (outputWidth - scaledWidth) / 2;
+      const y = (outputHeight - scaledHeight) / 2;
+
+      ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+    }
+
+    const link = document.createElement('a');
+    link.download = `book-mockup-${Date.now()}.png`;
+    link.href = finalCanvas.toDataURL('image/png');
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (error) {
+    console.error('Book download failed:', error);
+    setError('Book download failed. Please try again.');
+  } finally {
+    setIsDownloading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
