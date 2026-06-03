@@ -6,9 +6,25 @@ import {
   AlertCircle,
   CheckCircle,
   Download,
+  BookOpen,
+  Laptop,
+  Smartphone,
+  Tablet as TabletIcon,
+  Plus,
+  Minus,
+  Maximize2,
+  Zap,
+  FileText,
+  Image as ImageIcon,
+  ExternalLink,
+  HelpCircle,
+  Tv,
+  Sliders,
 } from 'lucide-react';
 import LaptopMockup from './components/LaptopMockup.tsx';
 import BookMockup from './components/BookMockup.tsx';
+import PhoneMockup from './components/PhoneMockup.tsx';
+import TabletMockup from './components/TabletMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import html2canvas from 'html2canvas';
@@ -22,16 +38,20 @@ function App() {
   const [error, setError] = useState<string>('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
+  
   const laptopMockupRef = useRef<HTMLDivElement>(null);
   const bookMockupRef = useRef<HTMLDivElement>(null);
+  const phoneMockupRef = useRef<HTMLDivElement>(null);
+  const tabletMockupRef = useRef<HTMLDivElement>(null);
+  
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [coverPosition, setCoverPosition] = useState<string>('0px');
   const [coverLeft, setCoverLeft] = useState<string>('0px');
   const [coverScale, setCoverScale] = useState<number>(1.0);
   const [outputWidth, setOutputWidth] = useState<number>(1200);
   const [outputHeight, setOutputHeight] = useState<number>(800);
-  const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
-  const [mockupTemplate, setMockupTemplate] = useState<string>('laptop');
+  const [backgroundColor, setBackgroundColor] = useState<string>('#0b0b18');
+  const [mockupTemplate, setMockupTemplate] = useState<string>('phone');
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -91,614 +111,966 @@ function App() {
   };
 
   const handleDownload = async () => {
-  if (mockupTemplate === 'laptop') {
-    await downloadLaptopMockup();
-  } else {
-    await downloadBookMockup();
-  }
-};
-
-
-
-// ==============================
-// LAPTOP MOCKUP (html2canvas)
-// ==============================
-const downloadLaptopMockup = async () => {
-  if (!laptopMockupRef.current || !imageUrl) return;
-
-  try {
-    setIsDownloading(true);
-
-    const tempDiv = document.createElement('div');
-    tempDiv.style.position = 'fixed';
-    tempDiv.style.left = '-9999px';
-    tempDiv.style.top = '0';
-    document.body.appendChild(tempDiv);
-
-    const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
-
-    // Remove loading animations
-    const loadingElements = clone.querySelectorAll('.animate-spin');
-    loadingElements.forEach((el) => el.remove());
-
-    // Fix laptop screen image
-    const screenImg = clone.querySelector(
-      '.lapi-screen img'
-    ) as HTMLImageElement | null;
-
-    if (screenImg) {
-      screenImg.style.display = 'block';
-
-      if (objectFit === 'cover') {
-        screenImg.style.transform = `scale(${coverScale})`;
-        screenImg.style.top = coverPosition;
-        screenImg.style.left = coverLeft;
-      } else {
-        screenImg.style.transform = `translate(-50%, -50%) scale(${coverScale})`;
-        screenImg.style.top = '50%';
-        screenImg.style.left = '50%';
-      }
+    if (mockupTemplate === 'laptop') {
+      await downloadLaptopMockup();
+    } else if (mockupTemplate === 'book') {
+      await downloadBookMockup();
+    } else if (mockupTemplate === 'phone') {
+      await downloadPhoneMockup();
+    } else if (mockupTemplate === 'tablet') {
+      await downloadTabletMockup();
     }
+  };
 
-    tempDiv.appendChild(clone);
+  // ==============================
+  // LAPTOP MOCKUP (html2canvas)
+  // ==============================
+  const downloadLaptopMockup = async () => {
+    if (!laptopMockupRef.current || !imageUrl) return;
 
-    // Wait for images
-    const images = clone.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
+    try {
+      setIsDownloading(true);
 
-    await Promise.all(
-      Array.from(images).map((img) => {
-        if (img.complete) return Promise.resolve();
+      const tempDiv = document.createElement('div');
+      tempDiv.style.position = 'fixed';
+      tempDiv.style.left = '-9999px';
+      tempDiv.style.top = '0';
+      document.body.appendChild(tempDiv);
 
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      })
-    );
+      const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
 
-    // Render
-    const canvas = await html2canvas(clone, {
-      backgroundColor: null,
-      scale: 3,
-      useCORS: true,
-      allowTaint: true,
-      logging: false,
-    });
+      // Remove loading animations
+      const loadingElements = clone.querySelectorAll('.animate-spin');
+      loadingElements.forEach((el) => el.remove());
 
-    // Final output
-    const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = outputWidth;
-    finalCanvas.height = outputHeight;
+      // Fix laptop screen image
+      const screenImg = clone.querySelector(
+        '.lapi-screen img'
+      ) as HTMLImageElement | null;
 
-    const ctx = finalCanvas.getContext('2d');
+      if (screenImg) {
+        screenImg.style.display = 'block';
 
-    if (ctx) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      ctx.fillStyle = backgroundColor || '#ffffff';
-      ctx.fillRect(0, 0, outputWidth, outputHeight);
-
-      const scaleX = outputWidth / canvas.width;
-      const scaleY = outputHeight / canvas.height;
-      const scale = Math.min(scaleX, scaleY);
-
-      const scaledWidth = canvas.width * scale;
-      const scaledHeight = canvas.height * scale;
-
-      const x = (outputWidth - scaledWidth) / 2;
-      const y = (outputHeight - scaledHeight) / 2;
-
-      ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
-    }
-
-    const link = document.createElement('a');
-    link.download = `laptop-mockup-${Date.now()}.png`;
-    link.href = finalCanvas.toDataURL('image/png');
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    document.body.removeChild(tempDiv);
-  } catch (error) {
-    console.error('Laptop download failed:', error);
-    setError('Laptop download failed. Please try again.');
-  } finally {
-    setIsDownloading(false);
-  }
-};
-
-
-
-// ==============================
-// BOOK MOCKUP (html-to-image)
-// ==============================
-const downloadBookMockup = async () => {
-  if (!bookMockupRef.current || !imageUrl) return;
-
-  try {
-    setIsDownloading(true);
-
-    // Wait for images
-    const images = bookMockupRef.current.querySelectorAll(
-      'img'
-    ) as NodeListOf<HTMLImageElement>;
-
-    await Promise.all(
-      Array.from(images).map((img) => {
-        if (img.complete) return Promise.resolve();
-
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      })
-    );
-
-    // Render using html-to-image
-    const canvas = await htmlToImage.toCanvas(bookMockupRef.current, {
-      backgroundColor: undefined,
-      pixelRatio: 2,
-
-      filter: (element) => {
-        if (element instanceof HTMLElement) {
-          return !element.classList.contains('animate-spin');
+        if (objectFit === 'cover') {
+          screenImg.style.transform = `scale(${coverScale})`;
+          screenImg.style.top = coverPosition;
+          screenImg.style.left = coverLeft;
+        } else {
+          screenImg.style.transform = `translate(-50%, -50%) scale(${coverScale})`;
+          screenImg.style.top = '50%';
+          screenImg.style.left = '50%';
         }
+      }
 
-        return true;
-      },
-    });
+      tempDiv.appendChild(clone);
 
-    // Final output
-    const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = outputWidth;
-    finalCanvas.height = outputHeight;
+      // Wait for images
+      const images = clone.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
 
-    const ctx = finalCanvas.getContext('2d');
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
 
-    if (ctx) {
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
 
-      ctx.fillStyle = backgroundColor || '#ffffff';
-      ctx.fillRect(0, 0, outputWidth, outputHeight);
+      // Render
+      const canvas = await html2canvas(clone, {
+        backgroundColor: null,
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+      });
 
-      const scaleX = outputWidth / canvas.width;
-      const scaleY = outputHeight / canvas.height;
-      const scale = Math.min(scaleX, scaleY);
+      // Final output
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth;
+      finalCanvas.height = outputHeight;
 
-      const scaledWidth = canvas.width * scale;
-      const scaledHeight = canvas.height * scale;
+      const ctx = finalCanvas.getContext('2d');
 
-      const x = (outputWidth - scaledWidth) / 2;
-      const y = (outputHeight - scaledHeight) / 2;
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
 
-      ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+        ctx.fillStyle = backgroundColor || '#0b0b18';
+        ctx.fillRect(0, 0, outputWidth, outputHeight);
+
+        const scaleX = outputWidth / canvas.width;
+        const scaleY = outputHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth - scaledWidth) / 2;
+        const y = (outputHeight - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `laptop-mockup-${Date.now()}.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      document.body.removeChild(tempDiv);
+    } catch (error) {
+      console.error('Laptop download failed:', error);
+      setError('Laptop download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
+  };
 
-    const link = document.createElement('a');
-    link.download = `book-mockup-${Date.now()}.png`;
-    link.href = finalCanvas.toDataURL('image/png');
+  // ==============================
+  // BOOK MOCKUP (html-to-image)
+  // ==============================
+  const downloadBookMockup = async () => {
+    if (!bookMockupRef.current || !imageUrl) return;
 
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  } catch (error) {
-    console.error('Book download failed:', error);
-    setError('Book download failed. Please try again.');
-  } finally {
-    setIsDownloading(false);
-  }
-};
+    try {
+      setIsDownloading(true);
+
+      // Wait for images
+      const images = bookMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
+
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      // Render using html-to-image
+      const canvas = await htmlToImage.toCanvas(bookMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin');
+          }
+          return true;
+        },
+      });
+
+      // Final output
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth;
+      finalCanvas.height = outputHeight;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        ctx.fillStyle = backgroundColor || '#0b0b18';
+        ctx.fillRect(0, 0, outputWidth, outputHeight);
+
+        const scaleX = outputWidth / canvas.width;
+        const scaleY = outputHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth - scaledWidth) / 2;
+        const y = (outputHeight - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `book-mockup-${Date.now()}.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Book download failed:', error);
+      setError('Book download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // ==============================
+  // PHONE MOCKUP (html-to-image)
+  // ==============================
+  const downloadPhoneMockup = async () => {
+    if (!phoneMockupRef.current || !imageUrl) return;
+
+    try {
+      setIsDownloading(true);
+
+      const images = phoneMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
+
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      const canvas = await htmlToImage.toCanvas(phoneMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin');
+          }
+          return true;
+        },
+      });
+
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth;
+      finalCanvas.height = outputHeight;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        ctx.fillStyle = backgroundColor || '#0b0b18';
+        ctx.fillRect(0, 0, outputWidth, outputHeight);
+
+        const scaleX = outputWidth / canvas.width;
+        const scaleY = outputHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth - scaledWidth) / 2;
+        const y = (outputHeight - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `phone-mockup-${Date.now()}.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Phone download failed:', error);
+      setError('Phone download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // ==============================
+  // TABLET MOCKUP (html-to-image)
+  // ==============================
+  const downloadTabletMockup = async () => {
+    if (!tabletMockupRef.current || !imageUrl) return;
+
+    try {
+      setIsDownloading(true);
+
+      const images = tabletMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
+
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      const canvas = await htmlToImage.toCanvas(tabletMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin');
+          }
+          return true;
+        },
+      });
+
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth;
+      finalCanvas.height = outputHeight;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        ctx.fillStyle = backgroundColor || '#0b0b18';
+        ctx.fillRect(0, 0, outputWidth, outputHeight);
+
+        const scaleX = outputWidth / canvas.width;
+        const scaleY = outputHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth - scaledWidth) / 2;
+        const y = (outputHeight - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `tablet-mockup-${Date.now()}.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Tablet download failed:', error);
+      setError('Tablet download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  // Color preset quick selects
+  const colorPresets = [
+    { name: 'Ink', value: '#0b0b18' },
+    { name: 'Snow', value: '#f8fafc' },
+    { name: 'Vermilion', value: '#e11d48' },
+    { name: 'Azure', value: '#0284c7' },
+    { name: 'Mint', value: '#059669' },
+    { name: 'None', value: 'transparent' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-[#07070c] text-[#e2e8f0] flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+      {/* Top Banner Alert when Backend Offline */}
       {backendStatus !== 'online' && (
         <div
-          className={`w-full px-4 py-3 text-center text-sm font-medium ${
-            backendStatus === 'checking' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+          className={`w-full px-4 py-2.5 text-center text-xs font-semibold border-b transition-all ${
+            backendStatus === 'checking' 
+              ? 'bg-yellow-950/40 text-yellow-300 border-yellow-800/30' 
+              : 'bg-red-950/40 text-red-300 border-red-800/30'
           }`}
         >
           {backendStatus === 'checking' ? (
             <div className="flex items-center justify-center space-x-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+              <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-yellow-400"></div>
               <span>Checking backend connection...</span>
             </div>
           ) : (
             <div className="flex items-center justify-center space-x-2">
-              <AlertCircle className="w-4 h-4" />
+              <AlertCircle className="w-3.5 h-3.5" />
               <span>
-                Backend server is offline. Please start the Python server:{' '}
-                <code className="bg-red-200 px-1 rounded">cd backend && python run.py</code>
+                Backend server is offline. Run inside workspace: <code className="bg-red-950/80 px-2 py-0.5 rounded border border-red-800/30 text-red-400 text-[10px] ml-1">python run.py</code>
               </span>
             </div>
           )}
         </div>
       )}
 
-      <header className="relative overflow-hidden">
-        <div className="absolute inset-0"></div>
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-          <div className="text-center">
-            <div className="flex justify-center items-center space-x-3 mb-6">
-              <div className="p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl shadow-lg">
-                <Monitor className="w-8 h-8 text-white" />
-              </div>
-              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+      {/* Modern Top Header */}
+      <header className="border-b border-[#1c1c38] bg-[#090915]/80 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <div className="p-2.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 rounded-xl shadow-[0_4px_15px_rgba(99,102,241,0.3)]">
+              <Monitor className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex items-center space-x-1.5">
+              <h1 className="text-lg font-bold tracking-tight text-white font-['Outfit']">
                 AI Display Studio
               </h1>
-              <Sparkles className="w-6 h-6 text-purple-500 animate-pulse" />
+              <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
             </div>
-            <div className="mt-4 flex justify-center">
-              <div
-                className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
-                  backendStatus === 'online'
-                    ? 'bg-green-100 text-green-800'
-                    : backendStatus === 'checking'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-              >
-                {backendStatus === 'online' ? (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Python Backend Online</span>
-                  </>
-                ) : backendStatus === 'checking' ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-yellow-600"></div>
-                    <span>Connecting...</span>
-                  </>
-                ) : (
-                  <>
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Backend Offline</span>
-                  </>
-                )}
-              </div>
+          </div>
+
+          <div className="flex items-center space-x-5">
+            <div className="flex items-center">
+              {backendStatus === 'online' ? (
+                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-ping"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 absolute"></span>
+                  <span>Backend online</span>
+                </div>
+              ) : backendStatus === 'checking' ? (
+                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                  <div className="animate-spin rounded-full h-2 w-2 border-b-2 border-yellow-400"></div>
+                  <span>Connecting...</span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                  <span>Backend offline</span>
+                </div>
+              )}
             </div>
+
+            <a
+              href="#"
+              className="text-xs font-semibold text-slate-400 hover:text-white transition-colors py-1.5"
+            >
+              Docs
+            </a>
+
+            <button
+              onClick={handleDownload}
+              disabled={isLoading || isDownloading || !imageUrl}
+              className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-700 text-white font-semibold text-xs px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export</span>
+            </button>
           </div>
         </div>
       </header>
-      <hr />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-5 mt-5">
-        <div className="grid lg:grid-cols-2 gap-12 items-start">
-          <div className="space-y-8">
-            <div className="bg-white rounded-2xl shadow-xl p-8 border border-gray-100">
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Your Content</h2>
-                <p className="text-gray-600">Select an image or PDF file to display on the selected mockup</p>
+
+      {/* Main Layout Area */}
+      <main className="flex-1 max-w-[1600px] mx-auto w-full px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* Left Column (Templates, Source Uploader, Capabilities) */}
+          <div className="lg:col-span-3 flex flex-col gap-6">
+            
+            {/* 1. Templates selector card */}
+            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+                <Monitor className="w-3 h-3 mr-1.5 text-indigo-400" />
+                Templates
+              </h3>
+              
+              <div className="grid grid-cols-2 gap-3">
+                {/* Book Tile */}
+                <button
+                  onClick={() => setMockupTemplate('book')}
+                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                    mockupTemplate === 'book'
+                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
+                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                  }`}
+                >
+                  <BookOpen className="w-5 h-5 mb-2 text-indigo-400" />
+                  <span className="text-xs">Book</span>
+                </button>
+
+                {/* Laptop Tile */}
+                <button
+                  onClick={() => setMockupTemplate('laptop')}
+                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                    mockupTemplate === 'laptop'
+                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
+                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                  }`}
+                >
+                  <Laptop className="w-5 h-5 mb-2 text-indigo-400" />
+                  <span className="text-xs">Laptop</span>
+                </button>
+
+                {/* Phone Tile */}
+                <button
+                  onClick={() => setMockupTemplate('phone')}
+                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                    mockupTemplate === 'phone'
+                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
+                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                  }`}
+                >
+                  <Smartphone className="w-5 h-5 mb-2 text-indigo-400" />
+                  <span className="text-xs">Phone</span>
+                </button>
+
+                {/* Tablet Tile */}
+                <button
+                  onClick={() => setMockupTemplate('tablet')}
+                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                    mockupTemplate === 'tablet'
+                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
+                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                  }`}
+                >
+                  <TabletIcon className="w-5 h-5 mb-2 text-indigo-400" />
+                  <span className="text-xs">Tablet</span>
+                </button>
               </div>
+            </div>
 
-              <FileUpload onFileSelect={handleFileSelect} isLoading={isLoading} disabled={backendStatus !== 'online'} />
+            {/* 2. Source file card */}
+            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-400 transform rotate-180" />
+                Source File
+              </h3>
 
+              {/* Uploader Box */}
+              <FileUpload 
+                onFileSelect={handleFileSelect} 
+                isLoading={isLoading} 
+                disabled={backendStatus !== 'online'} 
+              />
+
+              {/* File details container */}
               {fileName && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-                      <span className="text-sm font-medium text-blue-900">{fileName}</span>
-                    </div>
-                    <button
-                      onClick={handleReset}
-                      className="p-1 hover:bg-blue-100 rounded-full transition-colors"
-                      title="Reset"
-                    >
-                      <RotateCcw className="w-4 h-4 text-blue-600" />
-                    </button>
+                <div className="bg-[#101026] border border-[#1c1c3f] rounded-xl px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-2.5 min-w-0">
+                    <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                    <span className="text-xs font-semibold text-slate-200 truncate pr-2 max-w-[140px]" title={fileName}>
+                      {fileName}
+                    </span>
                   </div>
+                  <button
+                    onClick={handleReset}
+                    className="p-1 hover:bg-[#181836] rounded-lg transition-colors group flex-shrink-0"
+                    title="Reset File"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-indigo-400 group-hover:text-white transition-colors" />
+                  </button>
                 </div>
               )}
 
               {error && (
-                <div className="mt-4 p-4 bg-red-50 rounded-lg border border-red-200">
-                  <p className="text-sm text-red-800">{error}</p>
+                <div className="p-3 bg-red-950/40 border border-red-900/30 rounded-xl flex items-start space-x-2">
+                  <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-red-200 leading-normal">{error}</p>
                 </div>
               )}
-
-              <div className="mt-6 space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Output Settings</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Width (px)</label>
-                    <input
-                      type="number"
-                      value={outputWidth}
-                      onChange={(e) => setOutputWidth(parseInt(e.target.value) || 1200)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="1200"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Height (px)</label>
-                    <input
-                      type="number"
-                      value={outputHeight}
-                      onChange={(e) => setOutputHeight(parseInt(e.target.value) || 800)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="800"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="color"
-                      value={backgroundColor}
-                      onChange={(e) => setBackgroundColor(e.target.value)}
-                      className="w-10 h-10 p-0 border rounded cursor-pointer"
-                      title="Choose color"
-                    />
-                    <input
-                      type="text"
-                      value={backgroundColor}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(val) || val === '') {
-                          setBackgroundColor(val);
-                        }
-                      }}
-                      placeholder="#ffffff"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-500">
-                  Set the dimensions and background color for the downloaded mockup image
-                </p>
-              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                  <span className="text-2xl">🖼️</span>
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-2">Image Processing</h3>
-                <p className="text-sm text-gray-600">Upload JPG, PNG, GIF with Python-powered optimization</p>
-              </div>
+            {/* 3. Capabilities Checklist card */}
+            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                <Zap className="w-3 h-3 mr-1.5 text-indigo-400" />
+                Capabilities
+              </h3>
 
-              <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center mb-4">
-                  <span className="text-2xl">📄</span>
+              <div className="flex flex-col gap-3">
+                {/* Image optimization */}
+                <div className="flex items-center space-x-3 bg-[#0c0c1c]/60 border border-[#171732] px-3 py-2.5 rounded-xl">
+                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                    <ImageIcon className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">Image optimization</span>
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">PDF Extraction</h3>
-                <p className="text-sm text-gray-600">High-quality first page extraction using PyMuPDF</p>
+
+                {/* PDF first-page extract */}
+                <div className="flex items-center space-x-3 bg-[#0c0c1c]/60 border border-[#171732] px-3 py-2.5 rounded-xl">
+                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                    <FileText className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">PDF first-page extract</span>
+                </div>
+
+                {/* Live preview engine */}
+                <div className="flex items-center space-x-3 bg-[#0c0c1c]/60 border border-[#171732] px-3 py-2.5 rounded-xl">
+                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                    <Tv className="w-3.5 h-3.5" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-300">Live preview engine</span>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="space-y-8">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Live Preview</h2>
-              <p className="text-gray-600 mb-8">See your content displayed on a realistic mockup</p>
+          {/* Middle Column (Live Mockup Preview Viewport) */}
+          <div className="lg:col-span-6 flex flex-col gap-4">
+            
+            {/* Live Preview Header row */}
+            <div className="flex items-center justify-between px-1">
+              <div>
+                <h2 className="text-xl font-bold tracking-tight text-white font-['Outfit']">
+                  Live Preview
+                </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Your content rendered on the {mockupTemplate.charAt(0).toUpperCase() + mockupTemplate.slice(1)} mockup
+                </p>
+              </div>
+
+              {/* Contain / Cover toggle pill */}
+              <div className="bg-[#0e0e24] border border-[#1c1c38] p-1 rounded-full flex items-center shadow-inner">
+                <button
+                  onClick={() => {
+                    setObjectFit('contain');
+                    setCoverPosition('0px');
+                    setCoverLeft('0px');
+                    setCoverScale(1.0);
+                  }}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    objectFit === 'contain'
+                      ? 'bg-[#3b82f6] text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Contain
+                </button>
+                <button
+                  onClick={() => setObjectFit('cover')}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                    objectFit === 'cover'
+                      ? 'bg-[#3b82f6] text-white shadow-md'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Cover
+                </button>
+              </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Mockup Template</label>
-              <select
-                value={mockupTemplate}
-                onChange={(e) => setMockupTemplate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="laptop">Laptop Mockup</option>
-                <option value="book">Book Mockup</option>
-              </select>
-            </div>
+            {/* Canvas mockup window panel */}
+            <div className="relative bg-[#0c0c1c] border border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center">
+              
+              {/* Top Canvas Badges */}
+              <div className="absolute top-5 left-6 z-10 flex items-center">
+                <div className="bg-[#080814]/80 backdrop-blur-md border border-[#1c1c38] text-[10px] text-slate-300 font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>{outputWidth} × {outputHeight}</span>
+                </div>
+              </div>
 
-            <div className="flex justify-center">
-              {mockupTemplate === 'laptop' ? (
-                <LaptopMockup
-                  ref={laptopMockupRef}
-                  imageUrl={imageUrl}
-                  isLoading={isLoading}
-                  dominantColor={dominantColor}
-                  objectFit={objectFit}
-                  coverPosition={coverPosition}
-                  coverLeft={coverLeft}
-                  coverScale={objectFit === 'cover' ? coverScale : 1.0}
-                  backgroundColor={backgroundColor}
-                />
-              ) : (
-                <BookMockup
-                  ref={bookMockupRef}
-                  imageUrl={imageUrl}
-                  isLoading={isLoading}
-                  backgroundColor={backgroundColor}
-                  objectFit={objectFit}
-                  coverPosition={coverPosition}
-                  coverLeft={coverLeft}
-                  coverScale={objectFit === 'cover' ? coverScale : 1.0}
-                />
-              )}
-            </div>
+              <div className="absolute top-5 right-6 z-10">
+                <div className="bg-[#080814]/80 backdrop-blur-md border border-[#1c1c38] text-[10px] text-slate-300 font-semibold px-3 py-1.5 rounded-full">
+                  100%
+                </div>
+              </div>
 
-            {imageUrl && !isLoading && (
-              <div className="flex flex-col items-center space-y-4">
-                <div className="w-full space-y-4">
-                  <div className="flex items-center space-x-4 bg-white p-3 rounded-lg shadow-sm">
-                    <span className="text-sm font-medium text-gray-700">Image Fit:</span>
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => {
-                          setObjectFit('contain');
-                          setCoverPosition('0px');
-                          setCoverLeft('0px');
-                          setCoverScale(1.0);
-                        }}
-                        className={`px-3 py-1 text-sm rounded-md ${
-                          objectFit === 'contain'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        Contain
-                      </button>
-                      <button
-                        onClick={() => setObjectFit('cover')}
-                        className={`px-3 py-1 text-sm rounded-md ${
-                          objectFit === 'cover' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        Cover
-                      </button>
-                    </div>
-                  </div>
+              {/* Centered device container */}
+              <div className="w-full flex items-center justify-center py-6 mt-4">
+                {mockupTemplate === 'laptop' ? (
+                  <LaptopMockup
+                    ref={laptopMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                    backgroundColor={backgroundColor}
+                  />
+                ) : mockupTemplate === 'book' ? (
+                  <BookMockup
+                    ref={bookMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    backgroundColor={backgroundColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                  />
+                ) : mockupTemplate === 'phone' ? (
+                  <PhoneMockup
+                    ref={phoneMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                    backgroundColor={backgroundColor}
+                  />
+                ) : (
+                  <TabletMockup
+                    ref={tabletMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                    backgroundColor={backgroundColor}
+                  />
+                )}
+              </div>
 
-                  {objectFit === 'cover' && (
-                    <>
-                      <div className="bg-white p-3 rounded-lg shadow-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Vertical Position:</label>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={coverPosition}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (/^-?\d*\.?\d*px?$/.test(value) || value === '') {
-                                setCoverPosition(value.includes('px') ? value : `${value}px`);
-                              }
-                            }}
-                            onBlur={(e) => {
-                              let value = e.target.value;
-                              if (value === '') value = '0px';
-                              else if (!value.endsWith('px')) value = `${value}px`;
-                              const numericValue = value.replace(/[^\d.-]/g, '');
-                              setCoverPosition(`${numericValue}px`);
-                            }}
-                            placeholder="e.g. 50px or -20px"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          />
-                          <button
-                            onClick={() => setCoverPosition(`${(parseInt(coverPosition) || 0) + 10}px`)}
-                            className="px-3 py-2 bg-gray-100 rounded-md"
-                          >
-                            +10
-                          </button>
-                          <button
-                            onClick={() => setCoverPosition(`${(parseInt(coverPosition) || 0) - 10}px`)}
-                            className="px-3 py-2 bg-gray-100 rounded-md"
-                          >
-                            -10
-                          </button>
-                        </div>
-                      </div>
+              {/* Bottom Canvas control bar */}
+              <div className="w-full mt-4 flex items-center justify-between border-t border-[#1a1a32] pt-5">
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handleReset}
+                    className="bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] hover:border-slate-600 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5"
+                    title="Reset Preview"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reset</span>
+                  </button>
 
-                      <div className="bg-white p-3 rounded-lg shadow-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Horizontal Position:</label>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="text"
-                            value={coverLeft}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              if (/^-?\d*\.?\d*px?$/.test(value) || value === '') {
-                                setCoverLeft(value.includes('px') ? value : `${value}px`);
-                              }
-                            }}
-                            onBlur={(e) => {
-                              let value = e.target.value;
-                              if (value === '') value = '0px';
-                              else if (!value.endsWith('px')) value = `${value}px`;
-                              const numericValue = value.replace(/[^\d.-]/g, '');
-                              setCoverLeft(`${numericValue}px`);
-                            }}
-                            placeholder="e.g. 30px or -15px"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                          />
-                          <button
-                            onClick={() => setCoverLeft(`${(parseInt(coverLeft) || 0) + 10}px`)}
-                            className="px-3 py-2 bg-gray-100 rounded-md"
-                          >
-                            +10
-                          </button>
-                          <button
-                            onClick={() => setCoverLeft(`${(parseInt(coverLeft) || 0) - 10}px`)}
-                            className="px-3 py-2 bg-gray-100 rounded-md"
-                          >
-                            -10
-                          </button>
-                        </div>
-                      </div>
+                  <button
+                    onClick={() => setCoverScale(prev => Math.min(3.0, parseFloat((prev + 0.1).toFixed(2))))}
+                    className="p-2 bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] text-slate-300 hover:text-white rounded-xl transition-all"
+                    title="Zoom In"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                  </button>
 
-                      <div className="bg-white p-3 rounded-lg shadow-sm">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Zoom (Scale):</label>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="number"
-                            step={0.1}
-                            min={0}
-                            max={3}
-                            value={coverScale}
-                            onChange={(e) => {
-                              const value = parseFloat(e.target.value);
-                              if (!isNaN(value) && value >= 0 && value <= 3) {
-                                setCoverScale(parseFloat(value.toFixed(2)));
-                              }
-                            }}
-                            className="w-full px-3 py-2 border rounded-md"
-                            placeholder="e.g. 1"
-                          />
-                          <button
-                            onClick={() =>
-                              setCoverScale((prev) => {
-                                const next = parseFloat((prev + 0.1).toFixed(2));
-                                return next <= 3 ? next : prev;
-                              })
-                            }
-                            className="px-3 py-2 bg-gray-200 rounded-md"
-                          >
-                            +
-                          </button>
-                          <button
-                            onClick={() =>
-                              setCoverScale((prev) => {
-                                const next = parseFloat((prev - 0.1).toFixed(2));
-                                return next >= 0 ? next : prev;
-                              })
-                            }
-                            className="px-3 py-2 bg-gray-200 rounded-md"
-                          >
-                            -
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  <button
+                    onClick={() => setCoverScale(prev => Math.max(0.1, parseFloat((prev - 0.1).toFixed(2))))}
+                    className="p-2 bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] text-slate-300 hover:text-white rounded-xl transition-all"
+                    title="Zoom Out"
+                  >
+                    <Minus className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCoverPosition('0px');
+                      setCoverLeft('0px');
+                      setCoverScale(1.0);
+                    }}
+                    className="bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5"
+                    title="Fit Content"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Fit</span>
+                  </button>
                 </div>
 
                 <button
                   onClick={handleDownload}
-                  disabled={isLoading || isDownloading}
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                  disabled={isLoading || isDownloading || !imageUrl}
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-[0_4px_15px_rgba(59,130,246,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none"
                 >
                   {isDownloading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Preparing Download...</span>
-                    </div>
+                    <>
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                      <span>Rendering...</span>
+                    </>
                   ) : (
                     <>
-                      <Download className="w-4 h-4" />
+                      <Download className="w-3.5 h-3.5" />
                       <span>Download Mockup</span>
                     </>
                   )}
                 </button>
               </div>
-            )}
+            </div>
           </div>
+
+          {/* Right Column (Canvas Settings, Transform controls, Pro Tip) */}
+          <div className="lg:col-span-3 flex flex-col gap-6">
+            
+            {/* 1. Canvas settings card */}
+            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                <Sliders className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                Canvas
+              </h3>
+
+              {/* Background Color Picker Input */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  Background
+                </label>
+                <div className="flex items-center space-x-3">
+                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#2b2b54] cursor-pointer flex-shrink-0 shadow-inner">
+                    <input
+                      type="color"
+                      value={backgroundColor === 'transparent' ? '#000000' : backgroundColor}
+                      onChange={(e) => setBackgroundColor(e.target.value)}
+                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                      title="Choose custom background color"
+                    />
+                    <div 
+                      className="w-full h-full"
+                      style={{ backgroundColor: backgroundColor === 'transparent' ? '#000000' : backgroundColor }}
+                    >
+                      {backgroundColor === 'transparent' && (
+                        <div className="w-full h-full bg-grid-pattern opacity-40"></div>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={backgroundColor}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(val) || val === 'transparent' || val === '') {
+                        setBackgroundColor(val);
+                      }
+                    }}
+                    placeholder="#0b0b18"
+                    className="flex-1 bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Output Dimension Inputs */}
+              <div className="grid grid-cols-2 gap-3.5">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Width
+                  </label>
+                  <input
+                    type="number"
+                    value={outputWidth}
+                    onChange={(e) => setOutputWidth(parseInt(e.target.value) || 1200)}
+                    className="w-full bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
+                    placeholder="1200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Height
+                  </label>
+                  <input
+                    type="number"
+                    value={outputHeight}
+                    onChange={(e) => setOutputHeight(parseInt(e.target.value) || 800)}
+                    className="w-full bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
+                    placeholder="800"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Background Theme Presets */}
+              <div className="flex flex-wrap gap-2.5 mt-2">
+                {colorPresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => setBackgroundColor(preset.value)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-semibold border flex items-center transition-all ${
+                      backgroundColor === preset.value
+                        ? 'bg-[#181836] border-[#3b82f6] text-white font-bold shadow-md'
+                        : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                    }`}
+                  >
+                    <span 
+                      className="w-2 h-2 rounded-full mr-1.5 border border-white/10 flex-shrink-0"
+                      style={{ 
+                        backgroundColor: preset.value === 'transparent' ? '#000000' : preset.value,
+                        backgroundImage: preset.value === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)' : 'none',
+                        backgroundSize: preset.value === 'transparent' ? '4px 4px' : 'auto'
+                      }}
+                    ></span>
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Transform Sliders card */}
+            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-5">
+              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                Transform
+              </h3>
+
+              <div className="flex flex-col gap-4">
+                {/* Vertical position slider */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
+                    <span className="bg-[#10102a] border border-[#1c1c3c] text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                      {coverPosition}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-300"
+                    max="300"
+                    value={parseInt(coverPosition) || 0}
+                    onChange={(e) => setCoverPosition(`${e.target.value}px`)}
+                    className="slider-gradient-track mt-1"
+                  />
+                </div>
+
+                {/* Horizontal position slider */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
+                    <span className="bg-[#10102a] border border-[#1c1c3c] text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                      {coverLeft}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-300"
+                    max="300"
+                    value={parseInt(coverLeft) || 0}
+                    onChange={(e) => setCoverLeft(`${e.target.value}px`)}
+                    className="slider-gradient-track mt-1"
+                  />
+                </div>
+
+                {/* Zoom slider */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
+                    <span className="bg-[#10102a] border border-[#1c1c3c] text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                      {coverScale.toFixed(2)}x
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.0"
+                    step="0.05"
+                    value={coverScale}
+                    onChange={(e) => setCoverScale(parseFloat(e.target.value))}
+                    className="slider-gradient-track mt-1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Pro tip card */}
+            <div className="bg-gradient-to-br from-[#0c0c20]/60 to-[#10082c]/40 border border-purple-500/10 rounded-2xl p-5 shadow-lg flex flex-col gap-2.5">
+              <h4 className="text-xs font-semibold text-white flex items-center">
+                <HelpCircle className="w-3.5 h-3.5 mr-1.5 text-purple-400" />
+                Pro tip
+              </h4>
+              <p className="text-[11px] text-slate-400 leading-normal">
+                Hold the canvas and drag to nudge content. Use Fit to recenter at 100%.
+              </p>
+              <a 
+                href="#" 
+                className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center mt-1 transition-colors"
+              >
+                Learn shortcuts 
+                <ExternalLink className="w-2.5 h-2.5 ml-1" />
+              </a>
+            </div>
+
+          </div>
+
         </div>
       </main>
 
-      <footer className="bg-white border-t border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center text-gray-500">
-            <p>© 2025 AI Display Studio. Powered by Python + React architecture.</p>
-          </div>
+      {/* Crafted Footer */}
+      <footer className="border-t border-[#1c1c38] bg-[#05050d] py-6">
+        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center text-[11px] text-slate-500 font-semibold tracking-wide">
+          <p>© 2025 AI Display Studio · Crafted with Python + React</p>
         </div>
       </footer>
     </div>

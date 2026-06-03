@@ -49,7 +49,7 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
               <img
                 src={imageUrl}
                 alt="Display content"
-                className={`absolute left-0 right-0 mx-auto ${
+                className={`absolute left-0 right-0 mx-auto w-full h-full ${
                   objectFit === 'contain'
                     ? 'object-contain max-w-full max-h-full w-auto h-auto'
                     : 'object-cover'

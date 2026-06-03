@@ -26,10 +26,11 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
     return (
       <div
         ref={ref}
-        className="relative max-w-2xl mx-auto book-main-div"
+        className="relative max-w-2xl mx-auto w-full"
         style={{ backgroundColor: backgroundColor || '#f0f0f0' }}
       >
-        {/* Book base image */}
+        <div className='w-full relative max-w-[300px] mx-auto book-main-div'>
+          {/* Book base image */}
         <img
           src="/Book.png"
           alt="Book mockup"
@@ -50,7 +51,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
               <img
                 src={imageUrl}
                 alt="Book cover content"
-                className={`absolute left-0 right-0 mx-auto ${
+                className={`absolute left-0 right-0 mx-auto w-full h-full ${
                   objectFit === 'contain'
                     ? 'object-contain max-w-full max-h-full w-auto h-auto'
                     : 'object-cover'
@@ -71,6 +72,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
               {/* Default empty state */}
             </div>
           )}
+        </div>
         </div>
       </div>
     );

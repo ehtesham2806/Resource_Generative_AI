@@ -10,14 +10,14 @@
     perspective: 1000px;
 }
 
-.book-main-div img {
-    width: auto;
+.book-main-div>img {
+    width: 300px;
     height: 400px;
     display: block;
     margin: auto;
 }
 
-.book-cover {
+/* .book-cover {
     position: absolute;
     top: 4.9%;
     left: 27%;
@@ -26,12 +26,30 @@
     overflow: hidden;
     border-radius: 4px;
 
-    transform-style: preserve-3d;
-    transform: rotateY(-17deg);
+    transform: perspective(980px) rotateY(-15deg) rotate(0deg);
+    transform-origin: bottom left;
+} */
+.book-cover {
+    /* position: absolute;
+    top: 5.5%;
+    left: 30.1%;
+    width: 32%;
+    height: 75.9%;
+    overflow: hidden;
+    border-radius: 4px;
+    transform: perspective(859px) rotateY(-7deg) rotate(-0.2deg);
+    transform-origin: top left; */
 
-    /* transform: perspective(980px) rotateY(-15deg) rotate(0deg);
-    transform-origin: bottom left; */
+    top: 6.2%;
+    left: 8%;
+    width: 69%;
+    height: 85%;
+    overflow: hidden;
+    border-radius: 4px;
+    transform: perspective(859px) rotateY(-7deg) rotate(-0.2deg);
+    transform-origin: top left;
 }
+
 .book-cover img {
     /* transform: rotate(0deg) rotateY(-39deg);
     transform-origin: bottom left; */
