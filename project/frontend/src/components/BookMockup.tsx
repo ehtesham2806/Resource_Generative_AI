@@ -57,12 +57,16 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
                     : 'object-cover'
                 }`}
                 style={{
-                  top: objectFit === 'cover' ? coverPosition : '50%',
-                  left: objectFit === 'cover' ? coverLeft : '50%',
+                  top: '50%',
+                  left: '50%',
                   transform:
                     objectFit === 'contain'
-                      ? `translate(-50%, -50%) scale(${coverScale})`
-                      : `scale(${coverScale})`,
+                      ? `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`
+                      : `translate(-50%, -50%) scale(${coverScale})`,
+                  objectPosition:
+                    objectFit === 'cover'
+                      ? `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`
+                      : 'center',
                 }}
                 crossOrigin="anonymous"
               />

@@ -131,41 +131,9 @@ function App() {
     try {
       setIsDownloading(true);
 
-      const tempDiv = document.createElement('div');
-      tempDiv.style.position = 'fixed';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.top = '0';
-      document.body.appendChild(tempDiv);
-
-      const clone = laptopMockupRef.current.cloneNode(true) as HTMLElement;
-
-      // Remove loading animations
-      const loadingElements = clone.querySelectorAll('.animate-spin');
-      loadingElements.forEach((el) => el.remove());
-
-      // Fix laptop screen image
-      const screenImg = clone.querySelector(
-        '.lapi-screen img'
-      ) as HTMLImageElement | null;
-
-      if (screenImg) {
-        screenImg.style.display = 'block';
-
-        if (objectFit === 'cover') {
-          screenImg.style.transform = `scale(${coverScale})`;
-          screenImg.style.top = coverPosition;
-          screenImg.style.left = coverLeft;
-        } else {
-          screenImg.style.transform = `translate(-50%, -50%) scale(${coverScale})`;
-          screenImg.style.top = '50%';
-          screenImg.style.left = '50%';
-        }
-      }
-
-      tempDiv.appendChild(clone);
-
-      // Wait for images
-      const images = clone.querySelectorAll('img') as NodeListOf<HTMLImageElement>;
+      const images = laptopMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
 
       await Promise.all(
         Array.from(images).map((img) => {
@@ -178,16 +146,17 @@ function App() {
         })
       );
 
-      // Render
-      const canvas = await html2canvas(clone, {
-        backgroundColor: null,
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
+      const canvas = await htmlToImage.toCanvas(laptopMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin');
+          }
+          return true;
+        },
       });
 
-      // Final output
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = outputWidth;
       finalCanvas.height = outputHeight;
@@ -221,8 +190,6 @@ function App() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-
-      document.body.removeChild(tempDiv);
     } catch (error) {
       console.error('Laptop download failed:', error);
       setError('Laptop download failed. Please try again.');
