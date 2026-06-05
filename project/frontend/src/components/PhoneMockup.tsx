@@ -9,6 +9,7 @@ interface PhoneMockupProps {
   coverLeft?: string;
   coverScale?: number;
   backgroundColor?: string;
+  backgroundImage?: string;
 }
 
 const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
@@ -21,12 +22,19 @@ const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
     coverLeft = '0px',
     coverScale = 1,
     backgroundColor,
+    backgroundImage,
   }, ref) => {
     return (
       <div
         ref={ref}
         className="relative w-full aspect-[3/2] flex items-center justify-center overflow-hidden rounded-xl phone-main-div"
-        style={{ backgroundColor: backgroundColor || '#0b0b18' }}
+        style={{ 
+          backgroundColor: backgroundColor || '#0b0b18',
+          backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
       >
         {/* Soft back glowing highlight behind phone */}
         <div className="absolute w-[280px] h-[280px] rounded-full bg-blue-500/10 blur-[100px] pointer-events-none"></div>

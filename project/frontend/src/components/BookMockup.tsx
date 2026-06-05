@@ -10,6 +10,7 @@ interface BookMockupProps {
   coverLeft?: string;
   coverScale?: number;
   backgroundColor?: string;
+  backgroundImage?: string;
 }
 
 const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
@@ -22,12 +23,19 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
     coverLeft = '0px',
     coverScale = 1,
     backgroundColor,
+    backgroundImage,
   }, ref) => {
     return (
       <div
         ref={ref}
         className="relative max-w-2xl mx-auto w-full"
-        style={{ backgroundColor: backgroundColor || '#f0f0f0' }}
+        style={{ 
+          backgroundColor: backgroundColor || '#f0f0f0',
+          backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
       >
         <div className='w-full relative max-w-[300px] mx-auto book-main-div'>
           {/* Book base image */}

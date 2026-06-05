@@ -9,6 +9,7 @@ interface TabletMockupProps {
   coverLeft?: string;
   coverScale?: number;
   backgroundColor?: string;
+  backgroundImage?: string;
 }
 
 const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
@@ -21,12 +22,19 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
     coverLeft = '0px',
     coverScale = 1,
     backgroundColor,
+    backgroundImage,
   }, ref) => {
     return (
       <div
         ref={ref}
         className="relative w-full aspect-[3/2] flex items-center justify-center overflow-hidden rounded-xl tablet-main-div"
-        style={{ backgroundColor: backgroundColor || '#0b0b18' }}
+        style={{ 
+          backgroundColor: backgroundColor || '#0b0b18',
+          backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
       >
         {/* Soft background glow */}
         <div className="absolute w-[320px] h-[320px] rounded-full bg-indigo-500/10 blur-[120px] pointer-events-none"></div>

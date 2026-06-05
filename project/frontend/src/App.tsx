@@ -51,6 +51,7 @@ function App() {
   const [outputWidth, setOutputWidth] = useState<number>(1200);
   const [outputHeight, setOutputHeight] = useState<number>(800);
   const [backgroundColor, setBackgroundColor] = useState<string>('#0b0b18');
+  const [backgroundImage, setBackgroundImage] = useState<string>('');
   const [mockupTemplate, setMockupTemplate] = useState<string>('phone');
 
   useEffect(() => {
@@ -122,6 +123,37 @@ function App() {
     }
   };
 
+  const drawCanvasBackground = async (ctx: CanvasRenderingContext2D, width: number, height: number) => {
+    if (backgroundImage) {
+      const img = new Image();
+      img.src = backgroundImage;
+      await new Promise<void>((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+      });
+      const imgRatio = img.width / img.height;
+      const canvasRatio = width / height;
+      let sWidth = img.width;
+      let sHeight = img.height;
+      let sx = 0;
+      let sy = 0;
+      
+      if (imgRatio > canvasRatio) {
+        sWidth = img.height * canvasRatio;
+        sx = (img.width - sWidth) / 2;
+      } else {
+        sHeight = img.width / canvasRatio;
+        sy = (img.height - sHeight) / 2;
+      }
+      ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, width, height);
+    } else if (backgroundColor !== 'transparent') {
+      ctx.fillStyle = backgroundColor || '#0b0b18';
+      ctx.fillRect(0, 0, width, height);
+    } else {
+      ctx.clearRect(0, 0, width, height);
+    }
+  };
+
   // ==============================
   // LAPTOP MOCKUP (html2canvas)
   // ==============================
@@ -167,8 +199,7 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        ctx.fillStyle = backgroundColor || '#0b0b18';
-        ctx.fillRect(0, 0, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth, outputHeight);
 
         const scaleX = outputWidth / canvas.width;
         const scaleY = outputHeight / canvas.height;
@@ -246,8 +277,7 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        ctx.fillStyle = backgroundColor || '#0b0b18';
-        ctx.fillRect(0, 0, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth, outputHeight);
 
         const scaleX = outputWidth / canvas.width;
         const scaleY = outputHeight / canvas.height;
@@ -322,8 +352,7 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        ctx.fillStyle = backgroundColor || '#0b0b18';
-        ctx.fillRect(0, 0, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth, outputHeight);
 
         const scaleX = outputWidth / canvas.width;
         const scaleY = outputHeight / canvas.height;
@@ -398,8 +427,7 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        ctx.fillStyle = backgroundColor || '#0b0b18';
-        ctx.fillRect(0, 0, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth, outputHeight);
 
         const scaleX = outputWidth / canvas.width;
         const scaleY = outputHeight / canvas.height;
@@ -740,6 +768,7 @@ function App() {
                     coverLeft={coverLeft}
                     coverScale={coverScale}
                     backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
                   />
                 ) : mockupTemplate === 'book' ? (
                   <BookMockup
@@ -748,6 +777,7 @@ function App() {
                     isLoading={isLoading}
                     dominantColor={dominantColor}
                     backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
                     objectFit={objectFit}
                     coverPosition={coverPosition}
                     coverLeft={coverLeft}
@@ -764,6 +794,7 @@ function App() {
                     coverLeft={coverLeft}
                     coverScale={coverScale}
                     backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
                   />
                 ) : (
                   <TabletMockup
@@ -776,6 +807,7 @@ function App() {
                     coverLeft={coverLeft}
                     coverScale={coverScale}
                     backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
                   />
                 )}
               </div>
@@ -888,6 +920,47 @@ function App() {
                     placeholder="#0b0b18"
                     className="flex-1 bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
                   />
+                </div>
+              </div>
+
+              {/* Background Image Input */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>Background Image</span>
+                  {backgroundImage && (
+                    <button
+                      onClick={() => setBackgroundImage('')}
+                      className="text-red-400 hover:text-red-300 text-[10px] lowercase tracking-normal font-semibold transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </label>
+                
+                <div className="flex items-center space-x-2">
+                  <label className="flex-1 bg-[#0c0c1c]/80 border border-[#1c1c38] hover:border-[#3b82f6] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-slate-200 outline-none transition-all cursor-pointer text-center flex items-center justify-center space-x-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="truncate pr-1">
+                      {backgroundImage ? 'Change Image' : 'Upload Image'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (event.target?.result) {
+                              setBackgroundImage(event.target.result as string);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               </div>
 
