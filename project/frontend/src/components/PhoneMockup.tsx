@@ -34,20 +34,23 @@ const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
 
         {/* Smartphone Device container */}
         <div 
-          className="relative h-[85%] aspect-[1/2.05] rounded-[42px] border-[10px] border-[#181826] bg-[#0c0c1b] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8),_0_0_40px_rgba(99,102,241,0.08)] flex flex-col overflow-hidden"
-          style={{ boxSizing: 'border-box' }}
+          className="relative h-[90%] aspect-[1061/1408] phone-container"
         >
-          {/* Dynamic Island / Pill Notch */}
-          <div className="absolute top-[12px] left-1/2 -translate-x-1/2 w-[76px] h-[18px] bg-[#07070c] rounded-full z-30 flex items-center justify-end px-[5px] box-border shadow-inner">
-            {/* Small camera sensor reflection */}
-            <div className="w-[6px] h-[6px] rounded-full bg-[#1e293b] border border-blue-950"></div>
-          </div>
+          {/* Phone base image */}
+          <img
+            src="/Mobile.png"
+            alt="Phone mockup"
+            className="w-full h-full object-contain pointer-events-none select-none z-10 relative"
+          />
 
           {/* Screen area */}
           <div
-            className="relative w-full h-full overflow-hidden rounded-[32px]"
+            className="phone-screen"
             style={{ backgroundColor: dominantColor || '#0c0c1d' }}
           >
+            {/* Dynamic Island / Pill Notch */}
+            <div className="phone-notch" />
+
             {isLoading ? (
               <div className="w-full h-full flex items-center justify-center bg-black bg-opacity-70 z-10">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
