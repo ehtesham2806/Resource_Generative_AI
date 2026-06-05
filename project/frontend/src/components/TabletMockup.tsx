@@ -52,7 +52,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
               </div>
             ) : imageUrl ? (
-              <div className="relative w-full h-full">
+              <div className="relative w-full h-full overflow-hidden">
                 <img
                   src={imageUrl}
                   alt="Tablet display content"
@@ -61,18 +61,22 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
                       ? 'object-contain max-w-full max-h-full w-auto h-auto'
                       : 'object-cover'
                   }`}
-                  style={{
-                    top: '50%',
-                    left: '50%',
-                    transform:
-                      objectFit === 'contain'
-                        ? `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`
-                        : `translate(-50%, -50%) scale(${coverScale})`,
-                    objectPosition:
-                      objectFit === 'cover'
-                        ? `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`
-                        : 'center',
-                  }}
+                  style={
+                    objectFit === 'contain'
+                      ? {
+                          top: '50%',
+                          left: '50%',
+                          transform: `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`,
+                        }
+                      : {
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          width: `${100 * coverScale}%`,
+                          height: `${100 * coverScale}%`,
+                          objectPosition: `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`,
+                        }
+                  }
                   crossOrigin="anonymous"
                 />
               </div>
