@@ -29,6 +29,8 @@ import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import html2canvas from 'html2canvas';
 import * as htmlToImage from 'html-to-image';
+import { DROPDOWN_OPTIONS } from './utils/brands';
+import { SearchableBrandDropdown } from './components/SearchableBrandDropdown';
 
 function App() {
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -53,6 +55,7 @@ function App() {
   const [backgroundColor, setBackgroundColor] = useState<string>('#0b0b18');
   const [backgroundImage, setBackgroundImage] = useState<string>('');
   const [mockupTemplate, setMockupTemplate] = useState<string>('phone');
+  const [selectedBrand, setSelectedBrand] = useState<string>('');
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -109,6 +112,17 @@ function App() {
     setCoverScale(1.0);
     setCoverPosition('0px');
     setCoverLeft('0px');
+    setSelectedBrand('');
+  };
+
+  const handleBrandChange = (brandKey: string) => {
+    setSelectedBrand(brandKey);
+    if (brandKey && DROPDOWN_OPTIONS[brandKey]) {
+      const brand = DROPDOWN_OPTIONS[brandKey];
+      setOutputWidth(brand.width);
+      setOutputHeight(brand.height);
+      setBackgroundColor(brand.bgcolor);
+    }
   };
 
   const handleDownload = async () => {
@@ -885,6 +899,17 @@ function App() {
                 Canvas
               </h3>
 
+              {/* Brand Selector Dropdown */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>Brand Preset</span>
+                </label>
+                <SearchableBrandDropdown
+                  selectedBrand={selectedBrand}
+                  onBrandSelect={handleBrandChange}
+                />
+              </div>
+
               {/* Background Color Picker Input */}
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
@@ -895,7 +920,10 @@ function App() {
                     <input
                       type="color"
                       value={backgroundColor === 'transparent' ? '#000000' : backgroundColor}
-                      onChange={(e) => setBackgroundColor(e.target.value)}
+                      onChange={(e) => {
+                        setBackgroundColor(e.target.value);
+                        setSelectedBrand('');
+                      }}
                       className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
                       title="Choose custom background color"
                     />
@@ -915,6 +943,7 @@ function App() {
                       const val = e.target.value;
                       if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(val) || val === 'transparent' || val === '') {
                         setBackgroundColor(val);
+                        setSelectedBrand('');
                       }
                     }}
                     placeholder="#0b0b18"
@@ -973,7 +1002,10 @@ function App() {
                   <input
                     type="number"
                     value={outputWidth}
-                    onChange={(e) => setOutputWidth(parseInt(e.target.value) || 1200)}
+                    onChange={(e) => {
+                      setOutputWidth(parseInt(e.target.value) || 1200);
+                      setSelectedBrand('');
+                    }}
                     className="w-full bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
                     placeholder="1200"
                   />
@@ -986,7 +1018,10 @@ function App() {
                   <input
                     type="number"
                     value={outputHeight}
-                    onChange={(e) => setOutputHeight(parseInt(e.target.value) || 800)}
+                    onChange={(e) => {
+                      setOutputHeight(parseInt(e.target.value) || 800);
+                      setSelectedBrand('');
+                    }}
                     className="w-full bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
                     placeholder="800"
                   />
@@ -998,7 +1033,10 @@ function App() {
                 {colorPresets.map((preset) => (
                   <button
                     key={preset.name}
-                    onClick={() => setBackgroundColor(preset.value)}
+                    onClick={() => {
+                      setBackgroundColor(preset.value);
+                      setSelectedBrand('');
+                    }}
                     className={`px-3 py-1 rounded-full text-[10px] font-semibold border flex items-center transition-all ${
                       backgroundColor === preset.value
                         ? 'bg-[#181836] border-[#3b82f6] text-white font-bold shadow-md'
