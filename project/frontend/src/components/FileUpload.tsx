@@ -51,12 +51,12 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading,
     <div className="w-full max-w-md mx-auto">
       <div
         className={`
-          relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300
+          relative border-2 border-dashed rounded-xl p-8 text-center transition-all duration-300 group
           ${isDragOver && !isDisabled
-            ? 'border-blue-500 bg-blue-50 scale-105' 
+            ? 'border-indigo-500 bg-indigo-500/10 scale-[1.02] shadow-[0_0_25px_rgba(99,102,241,0.15)]' 
             : isDisabled
-            ? 'border-gray-200 bg-gray-50 opacity-50'
-            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+            ? 'border-[#1c1c38] bg-[#0c0c1c]/40 opacity-50'
+            : 'border-indigo-500/30 bg-[#0c0c1c]/30 hover:border-indigo-500/70 hover:bg-indigo-500/5'
           }
           ${isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}
         `}
@@ -77,22 +77,22 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading,
         <div className="space-y-4">
           <div className="flex justify-center space-x-2">
             <div className={`p-3 rounded-full transition-colors ${
-              isDragOver && !isDisabled ? 'bg-blue-100' : 'bg-gray-100'
+              isDragOver && !isDisabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-indigo-500/10 text-indigo-400 group-hover:bg-indigo-500/20'
             }`}>
-              <Upload className={`w-6 h-6 ${
-                isDragOver && !isDisabled ? 'text-blue-600' : 'text-gray-600'
-              }`} />
+              <Upload className="w-6 h-6" />
             </div>
           </div>
           
           <div>
-            <p className="text-lg font-medium text-gray-900 mb-2">
+            <p className={`text-base font-semibold transition-colors mb-2 ${
+              isDragOver && !isDisabled ? 'text-white' : 'text-slate-200 group-hover:text-white'
+            }`}>
               {isDisabled 
                 ? (disabled ? 'Backend server required' : 'Processing...')
                 : 'Drop your file here or click to browse'
               }
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs text-slate-400">
               {isDisabled 
                 ? (disabled ? 'Please start the Python backend server' : 'Please wait while processing')
                 : 'Supports images (JPG, PNG, GIF) and PDF files'
@@ -101,13 +101,13 @@ export const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect, isLoading,
           </div>
           
           {!isDisabled && (
-            <div className="flex justify-center space-x-4 text-xs text-gray-400">
-              <div className="flex items-center space-x-1">
-                <FileImage className="w-4 h-4" />
+            <div className="flex justify-center space-x-4 text-xs text-slate-400">
+              <div className="flex items-center space-x-1.5 hover:text-slate-300">
+                <FileImage className="w-3.5 h-3.5 text-indigo-400" />
                 <span>Images</span>
               </div>
-              <div className="flex items-center space-x-1">
-                <FileText className="w-4 h-4" />
+              <div className="flex items-center space-x-1.5 hover:text-slate-300">
+                <FileText className="w-3.5 h-3.5 text-indigo-400" />
                 <span>PDF</span>
               </div>
             </div>
