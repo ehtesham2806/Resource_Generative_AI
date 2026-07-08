@@ -10,6 +10,8 @@ interface PhoneMockupProps {
   coverScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
+  outputWidth: number;
+  outputHeight: number;
 }
 
 const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
@@ -23,12 +25,15 @@ const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
     coverScale = 1,
     backgroundColor,
     backgroundImage,
+    outputWidth,
+    outputHeight,
   }, ref) => {
     return (
       <div
         ref={ref}
-        className="relative w-full aspect-[3/2] flex items-center justify-center overflow-hidden rounded-xl phone-main-div"
+        className="relative w-full flex items-center justify-center overflow-hidden rounded-xl phone-main-div"
         style={{ 
+          aspectRatio: `${outputWidth} / ${outputHeight}`,
           backgroundColor: backgroundImage ? 'transparent' : (backgroundColor || '#0b0b18'),
           backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
           backgroundSize: 'cover',

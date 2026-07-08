@@ -900,6 +900,8 @@ function App() {
                     coverScale={coverScale}
                     backgroundColor={backgroundColor}
                     backgroundImage={backgroundImage}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
                   />
                 ) : mockupTemplate === 'book' ? (
                   <BookMockup
@@ -913,6 +915,8 @@ function App() {
                     coverPosition={coverPosition}
                     coverLeft={coverLeft}
                     coverScale={coverScale}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
                   />
                 ) : mockupTemplate === 'phone' ? (
                   <PhoneMockup
@@ -926,6 +930,8 @@ function App() {
                     coverScale={coverScale}
                     backgroundColor={backgroundColor}
                     backgroundImage={backgroundImage}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
                   />
                 ) : (
                   <TabletMockup
@@ -939,6 +945,8 @@ function App() {
                     coverScale={coverScale}
                     backgroundColor={backgroundColor}
                     backgroundImage={backgroundImage}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
                   />
                 )}
               </div>

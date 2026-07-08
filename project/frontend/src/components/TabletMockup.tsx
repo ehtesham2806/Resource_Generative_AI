@@ -10,6 +10,8 @@ interface TabletMockupProps {
   coverScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
+  outputWidth: number;
+  outputHeight: number;
 }
 
 const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
@@ -23,12 +25,15 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
     coverScale = 1,
     backgroundColor,
     backgroundImage,
+    outputWidth,
+    outputHeight,
   }, ref) => {
     return (
       <div
         ref={ref}
-        className="relative w-full aspect-[3/2] flex items-center justify-center overflow-hidden rounded-xl tablet-main-div"
+        className="relative w-full flex items-center justify-center overflow-hidden rounded-xl tablet-main-div"
         style={{ 
+          aspectRatio: `${outputWidth} / ${outputHeight}`,
           backgroundColor: backgroundImage ? 'transparent' : (backgroundColor || '#0b0b18'),
           backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
           backgroundSize: 'cover',

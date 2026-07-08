@@ -11,6 +11,8 @@ interface BookMockupProps {
   coverScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
+  outputWidth: number;
+  outputHeight: number;
 }
 
 const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
@@ -24,17 +26,22 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
     coverScale = 1,
     backgroundColor,
     backgroundImage,
+    outputWidth,
+    outputHeight,
   }, ref) => {
     return (
       <div
         ref={ref}
-        className="relative max-w-2xl mx-auto w-full"
+        className="relative w-full overflow-hidden flex items-center justify-center book-wrapper-div"
         style={{ 
+          aspectRatio: `${outputWidth} / ${outputHeight}`,
           backgroundColor: backgroundImage ? 'transparent' : (backgroundColor || '#f0f0f0'),
           backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
+          padding: '40px',
+          boxSizing: 'border-box'
         }}
       >
         <div className='w-full relative max-w-[300px] mx-auto book-main-div'>
