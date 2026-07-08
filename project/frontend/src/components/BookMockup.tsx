@@ -30,7 +30,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
         ref={ref}
         className="relative max-w-2xl mx-auto w-full"
         style={{ 
-          backgroundColor: backgroundColor || '#f0f0f0',
+          backgroundColor: backgroundImage ? 'transparent' : (backgroundColor || '#f0f0f0'),
           backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',

@@ -29,7 +29,7 @@ const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
         ref={ref}
         className="relative w-full aspect-[3/2] flex items-center justify-center overflow-hidden rounded-xl phone-main-div"
         style={{ 
-          backgroundColor: backgroundColor || '#0b0b18',
+          backgroundColor: backgroundImage ? 'transparent' : (backgroundColor || '#0b0b18'),
           backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',

@@ -25,6 +25,7 @@ import LaptopMockup from './components/LaptopMockup.tsx';
 import BookMockup from './components/BookMockup.tsx';
 import PhoneMockup from './components/PhoneMockup.tsx';
 import TabletMockup from './components/TabletMockup.tsx';
+import DefaultMockup from './components/DefaultMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import html2canvas from 'html2canvas';
@@ -41,6 +42,7 @@ function App() {
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
   
+  const defaultMockupRef = useRef<HTMLDivElement>(null);
   const laptopMockupRef = useRef<HTMLDivElement>(null);
   const bookMockupRef = useRef<HTMLDivElement>(null);
   const phoneMockupRef = useRef<HTMLDivElement>(null);
@@ -54,8 +56,10 @@ function App() {
   const [outputHeight, setOutputHeight] = useState<number>(800);
   const [backgroundColor, setBackgroundColor] = useState<string>('#0b0b18');
   const [backgroundImage, setBackgroundImage] = useState<string>('');
-  const [mockupTemplate, setMockupTemplate] = useState<string>('phone');
+  const [mockupTemplate, setMockupTemplate] = useState<string>('default');
   const [selectedBrand, setSelectedBrand] = useState<string>('');
+  const [imageWidth, setImageWidth] = useState<number>(0);
+  const [imageHeight, setImageHeight] = useState<number>(0);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -91,6 +95,10 @@ function App() {
       if (data.success) {
         setImageUrl(data.image_data);
         setDominantColor(data.dominant_color || '#1a1a2e');
+        if (data.image_size) {
+          setImageWidth(data.image_size.width);
+          setImageHeight(data.image_size.height);
+        }
       } else {
         throw new Error(data.detail || 'Unknown error');
       }
@@ -113,6 +121,8 @@ function App() {
     setCoverPosition('0px');
     setCoverLeft('0px');
     setSelectedBrand('');
+    setImageWidth(0);
+    setImageHeight(0);
   };
 
   const handleBrandChange = (brandKey: string) => {
@@ -126,7 +136,9 @@ function App() {
   };
 
   const handleDownload = async () => {
-    if (mockupTemplate === 'laptop') {
+    if (mockupTemplate === 'default') {
+      await downloadDefaultMockup();
+    } else if (mockupTemplate === 'laptop') {
       await downloadLaptopMockup();
     } else if (mockupTemplate === 'book') {
       await downloadBookMockup();
@@ -165,6 +177,81 @@ function App() {
       ctx.fillRect(0, 0, width, height);
     } else {
       ctx.clearRect(0, 0, width, height);
+    }
+  };
+
+  // ==============================
+  // DEFAULT MOCKUP (html-to-image)
+  // ==============================
+  const downloadDefaultMockup = async () => {
+    if (!defaultMockupRef.current || !imageUrl) return;
+
+    try {
+      setIsDownloading(true);
+
+      const images = defaultMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
+
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      const canvas = await htmlToImage.toCanvas(defaultMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin');
+          }
+          return true;
+        },
+      });
+
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth;
+      finalCanvas.height = outputHeight;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        await drawCanvasBackground(ctx, outputWidth, outputHeight);
+
+        const scaleX = outputWidth / canvas.width;
+        const scaleY = outputHeight / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth - scaledWidth) / 2;
+        const y = (outputHeight - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `default-mockup-${Date.now()}.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Default download failed:', error);
+      setError('Default download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
@@ -578,6 +665,19 @@ function App() {
               </h3>
               
               <div className="grid grid-cols-2 gap-3">
+                {/* Default Template Tile (Spans 2 columns, listed first) */}
+                <button
+                  onClick={() => setMockupTemplate('default')}
+                  className={`col-span-2 flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                    mockupTemplate === 'default'
+                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
+                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                  }`}
+                >
+                  <ImageIcon className="w-5 h-5 mb-2 text-indigo-400" />
+                  <span className="text-xs">Default</span>
+                </button>
+
                 {/* Book Tile */}
                 <button
                   onClick={() => setMockupTemplate('book')}
@@ -771,7 +871,24 @@ function App() {
 
               {/* Centered device container */}
               <div className="w-full flex items-center justify-center py-6 mt-4">
-                {mockupTemplate === 'laptop' ? (
+                {mockupTemplate === 'default' ? (
+                  <DefaultMockup
+                    ref={defaultMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                    backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
+                    imageWidth={imageWidth}
+                    imageHeight={imageHeight}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
+                  />
+                ) : mockupTemplate === 'laptop' ? (
                   <LaptopMockup
                     ref={laptopMockupRef}
                     imageUrl={imageUrl}

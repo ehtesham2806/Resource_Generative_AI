@@ -29,7 +29,7 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
         ref={ref}
         className="relative max-w-2xl mx-auto laptop-main-div"
         style={{ 
-          backgroundColor: backgroundColor || '#f0f0f0',
+          backgroundColor: backgroundImage ? 'transparent' : (backgroundColor || '#f0f0f0'),
           backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
