@@ -20,6 +20,8 @@ import {
   HelpCircle,
   Tv,
   Sliders,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import LaptopMockup from './components/LaptopMockup.tsx';
 import BookMockup from './components/BookMockup.tsx';
@@ -60,6 +62,32 @@ function App() {
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [imageWidth, setImageWidth] = useState<number>(0);
   const [imageHeight, setImageHeight] = useState<number>(0);
+
+  const [exportScale, setExportScale] = useState<number>(1);
+  const [isScaleDropdownOpen, setIsScaleDropdownOpen] = useState<boolean>(false);
+  const [isHeaderScaleDropdownOpen, setIsHeaderScaleDropdownOpen] = useState<boolean>(false);
+
+  const bottomScaleDropdownRef = useRef<HTMLDivElement>(null);
+  const headerScaleDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        bottomScaleDropdownRef.current &&
+        !bottomScaleDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsScaleDropdownOpen(false);
+      }
+      if (
+        headerScaleDropdownRef.current &&
+        !headerScaleDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsHeaderScaleDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -206,7 +234,7 @@ function App() {
 
       const canvas = await htmlToImage.toCanvas(defaultMockupRef.current, {
         backgroundColor: undefined,
-        pixelRatio: 2,
+        pixelRatio: 2 * exportScale,
         filter: (element) => {
           if (element instanceof HTMLElement) {
             return !element.classList.contains('animate-spin');
@@ -216,8 +244,8 @@ function App() {
       });
 
       const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outputWidth;
-      finalCanvas.height = outputHeight;
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
 
       const ctx = finalCanvas.getContext('2d');
 
@@ -225,23 +253,23 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        await drawCanvasBackground(ctx, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
 
-        const scaleX = outputWidth / canvas.width;
-        const scaleY = outputHeight / canvas.height;
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
         const scale = Math.min(scaleX, scaleY);
 
         const scaledWidth = canvas.width * scale;
         const scaledHeight = canvas.height * scale;
 
-        const x = (outputWidth - scaledWidth) / 2;
-        const y = (outputHeight - scaledHeight) / 2;
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
 
         ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
       }
 
       const link = document.createElement('a');
-      link.download = `default-mockup-${Date.now()}.png`;
+      link.download = `default-mockup-${Date.now()}-${exportScale}x.png`;
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -281,7 +309,7 @@ function App() {
 
       const canvas = await htmlToImage.toCanvas(laptopMockupRef.current, {
         backgroundColor: undefined,
-        pixelRatio: 2,
+        pixelRatio: 2 * exportScale,
         filter: (element) => {
           if (element instanceof HTMLElement) {
             return !element.classList.contains('animate-spin');
@@ -291,8 +319,8 @@ function App() {
       });
 
       const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outputWidth;
-      finalCanvas.height = outputHeight;
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
 
       const ctx = finalCanvas.getContext('2d');
 
@@ -300,23 +328,23 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        await drawCanvasBackground(ctx, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
 
-        const scaleX = outputWidth / canvas.width;
-        const scaleY = outputHeight / canvas.height;
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
         const scale = Math.min(scaleX, scaleY);
 
         const scaledWidth = canvas.width * scale;
         const scaledHeight = canvas.height * scale;
 
-        const x = (outputWidth - scaledWidth) / 2;
-        const y = (outputHeight - scaledHeight) / 2;
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
 
         ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
       }
 
       const link = document.createElement('a');
-      link.download = `laptop-mockup-${Date.now()}.png`;
+      link.download = `laptop-mockup-${Date.now()}-${exportScale}x.png`;
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -358,7 +386,7 @@ function App() {
       // Render using html-to-image
       const canvas = await htmlToImage.toCanvas(bookMockupRef.current, {
         backgroundColor: undefined,
-        pixelRatio: 2,
+        pixelRatio: 2 * exportScale,
         filter: (element) => {
           if (element instanceof HTMLElement) {
             return !element.classList.contains('animate-spin');
@@ -369,8 +397,8 @@ function App() {
 
       // Final output
       const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outputWidth;
-      finalCanvas.height = outputHeight;
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
 
       const ctx = finalCanvas.getContext('2d');
 
@@ -378,23 +406,23 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        await drawCanvasBackground(ctx, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
 
-        const scaleX = outputWidth / canvas.width;
-        const scaleY = outputHeight / canvas.height;
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
         const scale = Math.min(scaleX, scaleY);
 
         const scaledWidth = canvas.width * scale;
         const scaledHeight = canvas.height * scale;
 
-        const x = (outputWidth - scaledWidth) / 2;
-        const y = (outputHeight - scaledHeight) / 2;
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
 
         ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
       }
 
       const link = document.createElement('a');
-      link.download = `book-mockup-${Date.now()}.png`;
+      link.download = `book-mockup-${Date.now()}-${exportScale}x.png`;
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -434,7 +462,7 @@ function App() {
 
       const canvas = await htmlToImage.toCanvas(phoneMockupRef.current, {
         backgroundColor: undefined,
-        pixelRatio: 2,
+        pixelRatio: 2 * exportScale,
         filter: (element) => {
           if (element instanceof HTMLElement) {
             return !element.classList.contains('animate-spin');
@@ -444,8 +472,8 @@ function App() {
       });
 
       const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outputWidth;
-      finalCanvas.height = outputHeight;
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
 
       const ctx = finalCanvas.getContext('2d');
 
@@ -453,23 +481,23 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        await drawCanvasBackground(ctx, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
 
-        const scaleX = outputWidth / canvas.width;
-        const scaleY = outputHeight / canvas.height;
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
         const scale = Math.min(scaleX, scaleY);
 
         const scaledWidth = canvas.width * scale;
         const scaledHeight = canvas.height * scale;
 
-        const x = (outputWidth - scaledWidth) / 2;
-        const y = (outputHeight - scaledHeight) / 2;
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
 
         ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
       }
 
       const link = document.createElement('a');
-      link.download = `phone-mockup-${Date.now()}.png`;
+      link.download = `phone-mockup-${Date.now()}-${exportScale}x.png`;
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -509,7 +537,7 @@ function App() {
 
       const canvas = await htmlToImage.toCanvas(tabletMockupRef.current, {
         backgroundColor: undefined,
-        pixelRatio: 2,
+        pixelRatio: 2 * exportScale,
         filter: (element) => {
           if (element instanceof HTMLElement) {
             return !element.classList.contains('animate-spin');
@@ -519,8 +547,8 @@ function App() {
       });
 
       const finalCanvas = document.createElement('canvas');
-      finalCanvas.width = outputWidth;
-      finalCanvas.height = outputHeight;
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
 
       const ctx = finalCanvas.getContext('2d');
 
@@ -528,23 +556,23 @@ function App() {
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        await drawCanvasBackground(ctx, outputWidth, outputHeight);
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
 
-        const scaleX = outputWidth / canvas.width;
-        const scaleY = outputHeight / canvas.height;
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
         const scale = Math.min(scaleX, scaleY);
 
         const scaledWidth = canvas.width * scale;
         const scaledHeight = canvas.height * scale;
 
-        const x = (outputWidth - scaledWidth) / 2;
-        const y = (outputHeight - scaledHeight) / 2;
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
 
         ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
       }
 
       const link = document.createElement('a');
-      link.download = `tablet-mockup-${Date.now()}.png`;
+      link.download = `tablet-mockup-${Date.now()}-${exportScale}x.png`;
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -638,14 +666,45 @@ function App() {
               Docs
             </a>
 
-            <button
-              onClick={handleDownload}
-              disabled={isLoading || isDownloading || !imageUrl}
-              className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-700 text-white font-semibold text-xs px-4 py-2 rounded-full shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>Export</span>
-            </button>
+            <div className="flex items-stretch relative" ref={headerScaleDropdownRef}>
+              <button
+                onClick={handleDownload}
+                disabled={isLoading || isDownloading || !imageUrl}
+                className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-700 text-white font-semibold text-xs px-4 py-2 rounded-l-full shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.4)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none border-r border-indigo-400/20"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export ({exportScale}x)</span>
+              </button>
+              <button
+                onClick={() => setIsHeaderScaleDropdownOpen(!isHeaderScaleDropdownOpen)}
+                disabled={isLoading || isDownloading || !imageUrl}
+                className="bg-[#9333ea] hover:bg-[#7e22ce] text-white font-semibold text-xs px-2.5 rounded-r-full shadow-[0_4px_20px_rgba(99,102,241,0.25)] transition-all flex items-center disabled:opacity-40 disabled:pointer-events-none"
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isHeaderScaleDropdownOpen ? 'transform rotate-180' : ''}`} />
+              </button>
+              {isHeaderScaleDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-24 bg-[#090915] border border-[#1c1c38] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-1 flex flex-col gap-0.5">
+                  {[1, 2, 3].map((scale) => (
+                    <button
+                      key={scale}
+                      type="button"
+                      onClick={() => {
+                        setExportScale(scale);
+                        setIsHeaderScaleDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-between ${
+                        exportScale === scale
+                          ? 'bg-indigo-600 text-white'
+                          : 'text-slate-300 hover:bg-[#181836] hover:text-white'
+                      }`}
+                    >
+                      <span>{scale}x</span>
+                      {exportScale === scale && <Check className="w-3.5 h-3.5" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </header>
@@ -993,23 +1052,54 @@ function App() {
                   </button>
                 </div>
 
-                <button
-                  onClick={handleDownload}
-                  disabled={isLoading || isDownloading || !imageUrl}
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-xl shadow-[0_4px_15px_rgba(59,130,246,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none"
-                >
-                  {isDownloading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                      <span>Rendering...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Download Mockup</span>
-                    </>
+                <div className="flex items-stretch relative" ref={bottomScaleDropdownRef}>
+                  <button
+                    onClick={handleDownload}
+                    disabled={isLoading || isDownloading || !imageUrl}
+                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-l-xl shadow-[0_4px_15px_rgba(59,130,246,0.2)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none border-r border-indigo-400/20"
+                  >
+                    {isDownloading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                        <span>Rendering...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Download Mockup ({exportScale}x)</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setIsScaleDropdownOpen(!isScaleDropdownOpen)}
+                    disabled={isLoading || isDownloading || !imageUrl}
+                    className="bg-gradient-to-r from-[#4f46e5] to-[#4338ca] hover:from-[#4338ca] hover:to-[#3730a3] text-white font-semibold text-xs px-2.5 rounded-r-xl shadow-[0_4px_15px_rgba(59,130,246,0.2)] transition-all flex items-center disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isScaleDropdownOpen ? 'transform rotate-180' : ''}`} />
+                  </button>
+                  {isScaleDropdownOpen && (
+                    <div className="absolute right-0 bottom-full mb-1.5 z-50 w-24 bg-[#090915] border border-[#1c1c38] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-1 flex flex-col gap-0.5">
+                      {[1, 2, 3].map((scale) => (
+                        <button
+                          key={scale}
+                          type="button"
+                          onClick={() => {
+                            setExportScale(scale);
+                            setIsScaleDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-between ${
+                            exportScale === scale
+                              ? 'bg-indigo-600 text-white'
+                              : 'text-slate-300 hover:bg-[#181836] hover:text-white'
+                          }`}
+                        >
+                          <span>{scale}x</span>
+                          {exportScale === scale && <Check className="w-3.5 h-3.5" />}
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </button>
+                </div>
               </div>
             </div>
           </div>
