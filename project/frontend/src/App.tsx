@@ -22,6 +22,8 @@ import {
   Sliders,
   ChevronDown,
   Check,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import LaptopMockup from './components/LaptopMockup.tsx';
 import BookMockup from './components/BookMockup.tsx';
@@ -36,6 +38,24 @@ import { DROPDOWN_OPTIONS } from './utils/brands';
 import { SearchableBrandDropdown } from './components/SearchableBrandDropdown';
 
 function App() {
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('theme');
+      if (saved === 'light' || saved === 'dark') return saved;
+    }
+    return 'dark'; // default
+  });
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
   const [imageUrl, setImageUrl] = useState<string>('');
   const [dominantColor, setDominantColor] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -597,7 +617,7 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#07070c] text-[#e2e8f0] flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
+    <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-[#07070c] dark:text-[#e2e8f0] flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-300">
       {/* Top Banner Alert when Backend Offline */}
       {backendStatus !== 'online' && (
         <div
@@ -624,17 +644,17 @@ function App() {
       )}
 
       {/* Modern Top Header */}
-      <header className="border-b border-[#1c1c38] bg-[#090915]/80 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-slate-200 dark:border-[#1c1c38] bg-white/80 dark:bg-[#090915]/80 backdrop-blur-md sticky top-0 z-40 transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 rounded-xl shadow-[0_4px_15px_rgba(99,102,241,0.3)]">
+            <div className="p-2.5 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 rounded-xl shadow-[0_4px_15px_rgba(168,85,247,0.3)]">
               <Monitor className="w-5 h-5 text-white" />
             </div>
             <div className="flex items-center space-x-1.5">
-              <h1 className="text-lg font-bold tracking-tight text-white font-['Outfit']">
+              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white font-['Outfit']">
                 AI Display Studio
               </h1>
-              <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+              <Sparkles className="w-4 h-4 text-brand animate-pulse" />
             </div>
           </div>
 
@@ -661,16 +681,29 @@ function App() {
 
             <a
               href="#"
-              className="text-xs font-semibold text-slate-400 hover:text-white transition-colors py-1.5"
+              className="text-xs font-semibold text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors py-1.5"
             >
               Docs
             </a>
+
+            {/* Theme Toggle Button */}
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="p-2 bg-white/60 hover:bg-indigo-50/80 dark:bg-[#0e0e24] dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all shadow-sm flex items-center justify-center"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 text-amber-400 transition-transform hover:rotate-45 duration-300" />
+              ) : (
+                <Moon className="w-4 h-4 text-indigo-600 transition-transform hover:-rotate-12 duration-300" />
+              )}
+            </button>
 
             <div className="flex items-stretch relative" ref={headerScaleDropdownRef}>
               <button
                 onClick={handleDownload}
                 disabled={isLoading || isDownloading || !imageUrl}
-                className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-600 hover:from-blue-600 hover:via-indigo-600 hover:to-purple-700 text-white font-semibold text-xs px-4 py-2 rounded-l-full shadow-[0_4px_20px_rgba(99,102,241,0.25)] hover:shadow-[0_4px_25px_rgba(99,102,241,0.4)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none border-r border-indigo-400/20"
+                className="bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 hover:from-fuchsia-700 hover:via-violet-700 hover:to-purple-700 text-white font-semibold text-xs px-4 py-2 rounded-l-full shadow-[0_4px_20px_rgba(139,92,246,0.25)] hover:shadow-[0_4px_25px_rgba(139,92,246,0.4)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none border-r border-indigo-400/20"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>Export ({exportScale}x)</span>
@@ -678,12 +711,12 @@ function App() {
               <button
                 onClick={() => setIsHeaderScaleDropdownOpen(!isHeaderScaleDropdownOpen)}
                 disabled={isLoading || isDownloading || !imageUrl}
-                className="bg-[#9333ea] hover:bg-[#7e22ce] text-white font-semibold text-xs px-2.5 rounded-r-full shadow-[0_4px_20px_rgba(99,102,241,0.25)] transition-all flex items-center disabled:opacity-40 disabled:pointer-events-none"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold text-xs px-2.5 rounded-r-full shadow-[0_4px_20px_rgba(139,92,246,0.25)] transition-all flex items-center disabled:opacity-40 disabled:pointer-events-none"
               >
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isHeaderScaleDropdownOpen ? 'transform rotate-180' : ''}`} />
               </button>
               {isHeaderScaleDropdownOpen && (
-                <div className="absolute right-0 top-full mt-1.5 z-50 w-24 bg-[#090915] border border-[#1c1c38] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-1 flex flex-col gap-0.5">
+                <div className="absolute right-0 top-full mt-1.5 z-50 w-24 bg-white/95 dark:bg-[#090915]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#1c1c38] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-1 flex flex-col gap-0.5">
                   {[1, 2, 3].map((scale) => (
                     <button
                       key={scale}
@@ -695,7 +728,7 @@ function App() {
                       className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-between ${
                         exportScale === scale
                           ? 'bg-indigo-600 text-white'
-                          : 'text-slate-300 hover:bg-[#181836] hover:text-white'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#181836] hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
                       <span>{scale}x</span>
@@ -717,23 +750,29 @@ function App() {
           <div className="lg:col-span-3 flex flex-col gap-6">
             
             {/* 1. Templates selector card */}
-            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg">
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center">
-                <Monitor className="w-3 h-3 mr-1.5 text-indigo-400" />
+            <div className="premium-card rounded-2xl p-5">
+              <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+                <Monitor className="w-3 h-3 mr-1.5 text-brand" />
                 Templates
               </h3>
               
               <div className="grid grid-cols-2 gap-3">
                 {/* Default Template Tile (Spans 2 columns, listed first) */}
                 <button
-                  onClick={() => setMockupTemplate('default')}
+                  onClick={() => {
+                    setMockupTemplate('default');
+                    setObjectFit('contain');
+                    setCoverPosition('0px');
+                    setCoverLeft('0px');
+                    setCoverScale(1.0);
+                  }}
                   className={`col-span-2 flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
                     mockupTemplate === 'default'
-                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
-                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <ImageIcon className="w-5 h-5 mb-2 text-indigo-400" />
+                  <ImageIcon className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'default' ? 'text-white' : 'text-brand'}`} />
                   <span className="text-xs">Default</span>
                 </button>
 
@@ -742,11 +781,11 @@ function App() {
                   onClick={() => setMockupTemplate('book')}
                   className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
                     mockupTemplate === 'book'
-                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
-                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <BookOpen className="w-5 h-5 mb-2 text-indigo-400" />
+                  <BookOpen className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'book' ? 'text-white' : 'text-brand'}`} />
                   <span className="text-xs">Book</span>
                 </button>
 
@@ -755,11 +794,11 @@ function App() {
                   onClick={() => setMockupTemplate('laptop')}
                   className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
                     mockupTemplate === 'laptop'
-                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
-                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <Laptop className="w-5 h-5 mb-2 text-indigo-400" />
+                  <Laptop className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'laptop' ? 'text-white' : 'text-brand'}`} />
                   <span className="text-xs">Laptop</span>
                 </button>
 
@@ -768,11 +807,11 @@ function App() {
                   onClick={() => setMockupTemplate('phone')}
                   className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
                     mockupTemplate === 'phone'
-                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
-                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <Smartphone className="w-5 h-5 mb-2 text-indigo-400" />
+                  <Smartphone className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'phone' ? 'text-white' : 'text-brand'}`} />
                   <span className="text-xs">Phone</span>
                 </button>
 
@@ -781,20 +820,20 @@ function App() {
                   onClick={() => setMockupTemplate('tablet')}
                   className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
                     mockupTemplate === 'tablet'
-                      ? 'bg-[#181836] border-[#a855f7]/50 text-white shadow-[0_0_20px_rgba(168,85,247,0.15)] font-semibold'
-                      : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-[#2b2b54] hover:text-slate-200'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <TabletIcon className="w-5 h-5 mb-2 text-indigo-400" />
+                  <TabletIcon className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'tablet' ? 'text-white' : 'text-brand'}`} />
                   <span className="text-xs">Tablet</span>
                 </button>
               </div>
             </div>
 
             {/* 2. Source file card */}
-            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+            <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                <Download className="w-3.5 h-3.5 mr-1.5 text-indigo-400 transform rotate-180" />
+                <Download className="w-3.5 h-3.5 mr-1.5 text-brand transform rotate-180" />
                 Source File
               </h3>
 
@@ -807,19 +846,19 @@ function App() {
 
               {/* File details container */}
               {fileName && (
-                <div className="bg-[#101026] border border-[#1c1c3f] rounded-xl px-4 py-3 flex items-center justify-between">
+                <div className="bg-white/45 dark:bg-[#101026] border border-slate-200/60 dark:border-[#1c1c3f] rounded-xl px-4 py-3 flex items-center justify-between transition-colors duration-300">
                   <div className="flex items-center space-x-2.5 min-w-0">
                     <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                    <span className="text-xs font-semibold text-slate-200 truncate pr-2 max-w-[140px]" title={fileName}>
+                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate pr-2 max-w-[140px]" title={fileName}>
                       {fileName}
                     </span>
                   </div>
                   <button
                     onClick={handleReset}
-                    className="p-1 hover:bg-[#181836] rounded-lg transition-colors group flex-shrink-0"
+                    className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group flex-shrink-0"
                     title="Reset File"
                   >
-                    <RotateCcw className="w-3.5 h-3.5 text-indigo-400 group-hover:text-white transition-colors" />
+                    <RotateCcw className="w-3.5 h-3.5 text-brand group-hover:text-indigo-600 dark:group-hover:text-white transition-colors" />
                   </button>
                 </div>
               )}
@@ -833,35 +872,35 @@ function App() {
             </div>
 
             {/* 3. Capabilities Checklist card */}
-            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+            <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                <Zap className="w-3 h-3 mr-1.5 text-indigo-400" />
+                <Zap className="w-3 h-3 mr-1.5 text-brand" />
                 Capabilities
               </h3>
 
               <div className="flex flex-col gap-3">
                 {/* Image optimization */}
-                <div className="flex items-center space-x-3 bg-[#0c0c1c]/60 border border-[#171732] px-3 py-2.5 rounded-xl">
-                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2.5 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-brand">
                     <ImageIcon className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-xs font-medium text-slate-300">Image optimization</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Image optimization</span>
                 </div>
 
                 {/* PDF first-page extract */}
-                <div className="flex items-center space-x-3 bg-[#0c0c1c]/60 border border-[#171732] px-3 py-2.5 rounded-xl">
-                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2.5 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-brand">
                     <FileText className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-xs font-medium text-slate-300">PDF first-page extract</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">PDF first-page extract</span>
                 </div>
 
                 {/* Live preview engine */}
-                <div className="flex items-center space-x-3 bg-[#0c0c1c]/60 border border-[#171732] px-3 py-2.5 rounded-xl">
-                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-indigo-400">
+                <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2.5 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
+                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-brand">
                     <Tv className="w-3.5 h-3.5" />
                   </div>
-                  <span className="text-xs font-medium text-slate-300">Live preview engine</span>
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Live preview engine</span>
                 </div>
               </div>
             </div>
@@ -873,17 +912,20 @@ function App() {
             {/* Live Preview Header row */}
             <div className="flex items-center justify-between px-1">
               <div>
-                <h2 className="text-xl font-bold tracking-tight text-white font-['Outfit']">
+                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-['Outfit']">
                   Live Preview
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   Your content rendered on the {mockupTemplate.charAt(0).toUpperCase() + mockupTemplate.slice(1)} mockup
                 </p>
               </div>
 
               {/* Contain / Cover toggle pill */}
-              <div className="bg-[#0e0e24] border border-[#1c1c38] p-1 rounded-full flex items-center shadow-inner">
+              <div className={`bg-slate-100/70 dark:bg-[#0e0e24] border border-slate-200/60 dark:border-[#1c1c38] p-1 rounded-full flex items-center shadow-inner transition-all duration-300 ${
+                mockupTemplate === 'default' ? 'opacity-40 pointer-events-none select-none' : ''
+              }`}>
                 <button
+                  disabled={mockupTemplate === 'default'}
                   onClick={() => {
                     setObjectFit('contain');
                     setCoverPosition('0px');
@@ -892,18 +934,19 @@ function App() {
                   }}
                   className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
                     objectFit === 'contain'
-                      ? 'bg-[#3b82f6] text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-[#3359e9] text-white shadow-md'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   Contain
                 </button>
                 <button
+                  disabled={mockupTemplate === 'default'}
                   onClick={() => setObjectFit('cover')}
                   className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
                     objectFit === 'cover'
-                      ? 'bg-[#3b82f6] text-white shadow-md'
-                      : 'text-slate-400 hover:text-white'
+                      ? 'bg-[#3359e9] text-white shadow-md'
+                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   Cover
@@ -912,18 +955,18 @@ function App() {
             </div>
 
             {/* Canvas mockup window panel */}
-            <div className="relative bg-[#0c0c1c] border border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center">
+            <div className="relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
               
               {/* Top Canvas Badges */}
               <div className="absolute top-5 left-6 z-10 flex items-center">
-                <div className="bg-[#080814]/80 backdrop-blur-md border border-[#1c1c38] text-[10px] text-slate-300 font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1.5">
+                <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-colors duration-300">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>{outputWidth} × {outputHeight}</span>
                 </div>
               </div>
 
               <div className="absolute top-5 right-6 z-10">
-                <div className="bg-[#080814]/80 backdrop-blur-md border border-[#1c1c38] text-[10px] text-slate-300 font-semibold px-3 py-1.5 rounded-full">
+                <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full transition-colors duration-300">
                   100%
                 </div>
               </div>
@@ -1011,11 +1054,11 @@ function App() {
               </div>
 
               {/* Bottom Canvas control bar */}
-              <div className="w-full mt-4 flex items-center justify-between border-t border-[#1a1a32] pt-5">
+              <div className="w-full mt-4 flex items-center justify-between border-t border-slate-200/70 dark:border-[#1a1a32] pt-5">
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleReset}
-                    className="bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] hover:border-slate-600 text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5"
+                    className="bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow"
                     title="Reset Preview"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
@@ -1024,7 +1067,7 @@ function App() {
 
                   <button
                     onClick={() => setCoverScale(prev => Math.min(3.0, parseFloat((prev + 0.1).toFixed(2))))}
-                    className="p-2 bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] text-slate-300 hover:text-white rounded-xl transition-all"
+                    className="p-2 bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all shadow-sm hover:shadow"
                     title="Zoom In"
                   >
                     <Plus className="w-3.5 h-3.5" />
@@ -1032,7 +1075,7 @@ function App() {
 
                   <button
                     onClick={() => setCoverScale(prev => Math.max(0.1, parseFloat((prev - 0.1).toFixed(2))))}
-                    className="p-2 bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] text-slate-300 hover:text-white rounded-xl transition-all"
+                    className="p-2 bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all shadow-sm hover:shadow"
                     title="Zoom Out"
                   >
                     <Minus className="w-3.5 h-3.5" />
@@ -1044,7 +1087,7 @@ function App() {
                       setCoverLeft('0px');
                       setCoverScale(1.0);
                     }}
-                    className="bg-[#0e0e24] hover:bg-[#181836] border border-[#1c1c38] text-slate-300 hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5"
+                    className="bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow"
                     title="Fit Content"
                   >
                     <Maximize2 className="w-3.5 h-3.5" />
@@ -1056,7 +1099,7 @@ function App() {
                   <button
                     onClick={handleDownload}
                     disabled={isLoading || isDownloading || !imageUrl}
-                    className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-semibold text-xs px-4 py-2 rounded-l-xl shadow-[0_4px_15px_rgba(59,130,246,0.2)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none border-r border-indigo-400/20"
+                    className="bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 hover:from-fuchsia-700 hover:via-violet-700 hover:to-purple-700 text-white font-semibold text-xs px-4 py-2 rounded-l-xl shadow-[0_4px_15_rgba(168,85,247,0.2)] hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center space-x-1.5 disabled:opacity-40 disabled:hover:scale-100 disabled:pointer-events-none border-r border-indigo-400/20"
                   >
                     {isDownloading ? (
                       <>
@@ -1073,12 +1116,12 @@ function App() {
                   <button
                     onClick={() => setIsScaleDropdownOpen(!isScaleDropdownOpen)}
                     disabled={isLoading || isDownloading || !imageUrl}
-                    className="bg-gradient-to-r from-[#4f46e5] to-[#4338ca] hover:from-[#4338ca] hover:to-[#3730a3] text-white font-semibold text-xs px-2.5 rounded-r-xl shadow-[0_4px_15px_rgba(59,130,246,0.2)] transition-all flex items-center disabled:opacity-40 disabled:pointer-events-none"
+                    className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white font-semibold text-xs px-2.5 rounded-r-xl shadow-[0_4px_15px_rgba(168,85,247,0.2)] transition-all flex items-center disabled:opacity-40 disabled:pointer-events-none"
                   >
                     <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isScaleDropdownOpen ? 'transform rotate-180' : ''}`} />
                   </button>
                   {isScaleDropdownOpen && (
-                    <div className="absolute right-0 bottom-full mb-1.5 z-50 w-24 bg-[#090915] border border-[#1c1c38] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-1 flex flex-col gap-0.5">
+                    <div className="absolute right-0 bottom-full mb-1.5 z-50 w-24 bg-white/95 dark:bg-[#090915]/95 backdrop-blur-md border border-slate-200/80 dark:border-[#1c1c38] rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.08)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] p-1 flex flex-col gap-0.5">
                       {[1, 2, 3].map((scale) => (
                         <button
                           key={scale}
@@ -1090,7 +1133,7 @@ function App() {
                           className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center justify-between ${
                             exportScale === scale
                               ? 'bg-indigo-600 text-white'
-                              : 'text-slate-300 hover:bg-[#181836] hover:text-white'
+                              : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#181836] hover:text-slate-900 dark:hover:text-white'
                           }`}
                         >
                           <span>{scale}x</span>
@@ -1108,9 +1151,9 @@ function App() {
           <div className="lg:col-span-3 flex flex-col gap-6">
             
             {/* 1. Canvas settings card */}
-            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-4">
+            <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                <Sliders className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                <Sliders className="w-3.5 h-3.5 mr-1.5 text-brand" />
                 Canvas
               </h3>
 
@@ -1131,7 +1174,7 @@ function App() {
                   Background
                 </label>
                 <div className="flex items-center space-x-3">
-                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#2b2b54] cursor-pointer flex-shrink-0 shadow-inner">
+                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0 shadow-inner">
                     <input
                       type="color"
                       value={backgroundColor === 'transparent' ? '#000000' : backgroundColor}
@@ -1162,7 +1205,7 @@ function App() {
                       }
                     }}
                     placeholder="#0b0b18"
-                    className="flex-1 bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
+                    className="premium-input flex-1"
                   />
                 </div>
               </div>
@@ -1182,8 +1225,8 @@ function App() {
                 </label>
                 
                 <div className="flex items-center space-x-2">
-                  <label className="flex-1 bg-[#0c0c1c]/80 border border-[#1c1c38] hover:border-[#3b82f6] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-400 hover:text-slate-200 outline-none transition-all cursor-pointer text-center flex items-center justify-center space-x-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
+                  <label className="premium-input flex-1 cursor-pointer text-center flex items-center justify-center space-x-1.5 hover:text-slate-800 dark:hover:text-slate-200">
+                    <ImageIcon className="w-3.5 h-3.5 text-brand" />
                     <span className="truncate pr-1">
                       {backgroundImage ? 'Change Image' : 'Upload Image'}
                     </span>
@@ -1221,7 +1264,7 @@ function App() {
                       setOutputWidth(parseInt(e.target.value) || 1200);
                       setSelectedBrand('');
                     }}
-                    className="w-full bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
+                    className="premium-input w-full"
                     placeholder="1200"
                   />
                 </div>
@@ -1237,7 +1280,7 @@ function App() {
                       setOutputHeight(parseInt(e.target.value) || 800);
                       setSelectedBrand('');
                     }}
-                    className="w-full bg-[#0c0c1c]/80 border border-[#1c1c38] rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-200 outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6] transition-colors"
+                    className="premium-input w-full"
                     placeholder="800"
                   />
                 </div>
@@ -1254,8 +1297,8 @@ function App() {
                     }}
                     className={`px-3 py-1 rounded-full text-[10px] font-semibold border flex items-center transition-all ${
                       backgroundColor === preset.value
-                        ? 'bg-[#181836] border-[#3b82f6] text-white font-bold shadow-md'
-                        : 'bg-[#0c0c1c]/60 border-[#1c1c38] text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        ? 'bg-indigo-50/80 dark:bg-[#181836] border-indigo-500 dark:border-[#3b82f6] text-indigo-950 dark:text-white font-bold shadow-sm'
+                        : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
                   >
                     <span 
@@ -1273,9 +1316,9 @@ function App() {
             </div>
 
             {/* 2. Transform Sliders card */}
-            <div className="bg-[#090915] border border-[#1c1c38] rounded-2xl p-5 shadow-lg flex flex-col gap-5">
+            <div className="premium-card rounded-2xl p-5 flex flex-col gap-5">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-indigo-400" />
+                <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-brand" />
                 Transform
               </h3>
 
@@ -1284,7 +1327,7 @@ function App() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
-                    <span className="bg-[#10102a] border border-[#1c1c3c] text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                    <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
                       {coverPosition}
                     </span>
                   </div>
@@ -1302,7 +1345,7 @@ function App() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
-                    <span className="bg-[#10102a] border border-[#1c1c3c] text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                    <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
                       {coverLeft}
                     </span>
                   </div>
@@ -1320,7 +1363,7 @@ function App() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
-                    <span className="bg-[#10102a] border border-[#1c1c3c] text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px]">
+                    <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
                       {coverScale.toFixed(2)}x
                     </span>
                   </div>
@@ -1338,17 +1381,17 @@ function App() {
             </div>
 
             {/* 3. Pro tip card */}
-            <div className="bg-gradient-to-br from-[#0c0c20]/60 to-[#10082c]/40 border border-purple-500/10 rounded-2xl p-5 shadow-lg flex flex-col gap-2.5">
-              <h4 className="text-xs font-semibold text-white flex items-center">
-                <HelpCircle className="w-3.5 h-3.5 mr-1.5 text-purple-400" />
+            <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-[#0c0c20]/60 dark:to-[#10082c]/40 border border-indigo-100 dark:border-purple-500/10 rounded-2xl p-5 shadow-lg flex flex-col gap-2.5 transition-colors duration-300">
+              <h4 className="text-xs font-semibold text-slate-800 dark:text-white flex items-center">
+                <HelpCircle className="w-3.5 h-3.5 mr-1.5 text-brand" />
                 Pro tip
               </h4>
-              <p className="text-[11px] text-slate-400 leading-normal">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
                 Hold the canvas and drag to nudge content. Use Fit to recenter at 100%.
               </p>
               <a 
                 href="#" 
-                className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center mt-1 transition-colors"
+                className="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center mt-1 transition-colors"
               >
                 Learn shortcuts 
                 <ExternalLink className="w-2.5 h-2.5 ml-1" />
@@ -1361,8 +1404,8 @@ function App() {
       </main>
 
       {/* Crafted Footer */}
-      <footer className="border-t border-[#1c1c38] bg-[#05050d] py-6">
-        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center text-[11px] text-slate-500 font-semibold tracking-wide">
+      <footer className="border-t border-slate-200 dark:border-[#1c1c38] bg-slate-100 dark:bg-[#05050d] py-6 transition-colors duration-300">
+        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center text-[11px] text-slate-600 dark:text-slate-500 font-semibold tracking-wide">
           <p>© 2025 AI Display Studio · Crafted with Python + React</p>
         </div>
       </footer>

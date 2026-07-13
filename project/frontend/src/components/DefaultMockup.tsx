@@ -20,8 +20,6 @@ const DefaultMockup = forwardRef<HTMLDivElement, DefaultMockupProps>(
   ({
     imageUrl,
     isLoading,
-    dominantColor,
-    objectFit = 'contain',
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
