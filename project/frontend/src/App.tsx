@@ -25,11 +25,11 @@ import {
   Sun,
   Moon,
 } from 'lucide-react';
-import LaptopMockup from './components/LaptopMockup.tsx';
-import BookMockup from './components/BookMockup.tsx';
-import PhoneMockup from './components/PhoneMockup.tsx';
-import TabletMockup from './components/TabletMockup.tsx';
-import DefaultMockup from './components/DefaultMockup.tsx';
+import LaptopMockup from './components/mockups/LaptopMockup.tsx';
+import BookMockup from './components/mockups/BookMockup.tsx';
+import PhoneMockup from './components/mockups/PhoneMockup.tsx';
+import TabletMockup from './components/mockups/TabletMockup.tsx';
+import DefaultMockup from './components/mockups/DefaultMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import html2canvas from 'html2canvas';

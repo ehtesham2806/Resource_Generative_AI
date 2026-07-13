@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import '../assets/BookMockup.css';
+import '../../assets/BookMockup.css';
 
 interface BookMockupProps {
   imageUrl?: string;
