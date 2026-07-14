@@ -30,9 +30,9 @@ import BookMockup from './components/mockups/BookMockup.tsx';
 import PhoneMockup from './components/mockups/PhoneMockup.tsx';
 import TabletMockup from './components/mockups/TabletMockup.tsx';
 import DefaultMockup from './components/mockups/DefaultMockup.tsx';
+import WebinarMockup from './components/mockups/WebinarMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
-import html2canvas from 'html2canvas';
 import * as htmlToImage from 'html-to-image';
 import { DROPDOWN_OPTIONS } from './utils/brands';
 import { SearchableBrandDropdown } from './components/SearchableBrandDropdown';
@@ -69,6 +69,7 @@ function App() {
   const bookMockupRef = useRef<HTMLDivElement>(null);
   const phoneMockupRef = useRef<HTMLDivElement>(null);
   const tabletMockupRef = useRef<HTMLDivElement>(null);
+  const webinarMockupRef = useRef<HTMLDivElement>(null);
   
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [coverPosition, setCoverPosition] = useState<string>('0px');
@@ -82,6 +83,19 @@ function App() {
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const [imageWidth, setImageWidth] = useState<number>(0);
   const [imageHeight, setImageHeight] = useState<number>(0);
+  
+  const [webinarHeading, setWebinarHeading] = useState<string>('Free Live Webinar');
+  const [webinarDescription, setWebinarDescription] = useState<string>('Learn the best practices of UI/UX design and premium front-end development patterns.');
+  const [webinarHeadingColor, setWebinarHeadingColor] = useState<string>('#ffffff');
+  const [webinarHeadingSize, setWebinarHeadingSize] = useState<number>(36);
+  const [webinarDescriptionColor, setWebinarDescriptionColor] = useState<string>('#cbd5e1');
+  const [webinarDescriptionSize, setWebinarDescriptionSize] = useState<number>(14);
+  const [webinarShowBadge, setWebinarShowBadge] = useState<boolean>(true);
+  const [webinarBadgeText, setWebinarBadgeText] = useState<string>('Live Webinar');
+  const [webinarBadgeBgColor, setWebinarBadgeBgColor] = useState<string>('rgba(217, 70, 239, 0.15)');
+  const [webinarBadgeBorderColor, setWebinarBadgeBorderColor] = useState<string>('rgba(217, 70, 239, 0.20)');
+  const [webinarBadgeTextColor, setWebinarBadgeTextColor] = useState<string>('#d946ef');
+  const [webinarBadgeDotColor, setWebinarBadgeDotColor] = useState<string>('#d946ef');
 
   const [exportScale, setExportScale] = useState<number>(1);
   const [isScaleDropdownOpen, setIsScaleDropdownOpen] = useState<boolean>(false);
@@ -171,6 +185,18 @@ function App() {
     setSelectedBrand('');
     setImageWidth(0);
     setImageHeight(0);
+    setWebinarHeading('Free Live Webinar');
+    setWebinarDescription('Learn the best practices of UI/UX design and premium front-end development patterns.');
+    setWebinarHeadingColor('#ffffff');
+    setWebinarHeadingSize(36);
+    setWebinarDescriptionColor('#cbd5e1');
+    setWebinarDescriptionSize(14);
+    setWebinarShowBadge(true);
+    setWebinarBadgeText('Live Webinar');
+    setWebinarBadgeBgColor('rgba(217, 70, 239, 0.15)');
+    setWebinarBadgeBorderColor('rgba(217, 70, 239, 0.20)');
+    setWebinarBadgeTextColor('#d946ef');
+    setWebinarBadgeDotColor('#d946ef');
   };
 
   const handleBrandChange = (brandKey: string) => {
@@ -194,6 +220,8 @@ function App() {
       await downloadPhoneMockup();
     } else if (mockupTemplate === 'tablet') {
       await downloadTabletMockup();
+    } else if (mockupTemplate === 'webinar') {
+      await downloadWebinarMockup();
     }
   };
 
@@ -606,6 +634,81 @@ function App() {
     }
   };
 
+  // ==============================
+  // WEBINAR MOCKUP (html-to-image)
+  // ==============================
+  const downloadWebinarMockup = async () => {
+    if (!webinarMockupRef.current || !imageUrl) return;
+
+    try {
+      setIsDownloading(true);
+
+      const images = webinarMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
+
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      const canvas = await htmlToImage.toCanvas(webinarMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2 * exportScale,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin');
+          }
+          return true;
+        },
+      });
+
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
+
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `webinar-mockup-${Date.now()}-${exportScale}x.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Webinar download failed:', error);
+      setError('Webinar download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   // Color preset quick selects
   const colorPresets = [
     { name: 'Ink', value: '#0b0b18' },
@@ -750,14 +853,14 @@ function App() {
           <div className="lg:col-span-3 flex flex-col gap-6">
             
             {/* 1. Templates selector card */}
-            <div className="premium-card rounded-2xl p-5">
-              <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mb-4 flex items-center">
+            <div className="premium-card rounded-2xl p-4">
+              <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center">
                 <Monitor className="w-3 h-3 mr-1.5 text-brand" />
                 Templates
               </h3>
               
-              <div className="grid grid-cols-2 gap-3">
-                {/* Default Template Tile (Spans 2 columns, listed first) */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* Default Template Tile */}
                 <button
                   onClick={() => {
                     setMockupTemplate('default');
@@ -766,66 +869,79 @@ function App() {
                     setCoverLeft('0px');
                     setCoverScale(1.0);
                   }}
-                  className={`col-span-2 flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                  className={`col-span-1 flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
                     mockupTemplate === 'default'
                       ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
                       : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <ImageIcon className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'default' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-xs">Default</span>
+                  <ImageIcon className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'default' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Default</span>
+                </button>
+
+                {/* Webinar Tile */}
+                <button
+                  onClick={() => setMockupTemplate('webinar')}
+                  className={`col-span-1 flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
+                    mockupTemplate === 'webinar'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <Tv className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'webinar' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Webinar</span>
                 </button>
 
                 {/* Book Tile */}
                 <button
                   onClick={() => setMockupTemplate('book')}
-                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
                     mockupTemplate === 'book'
                       ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
                       : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <BookOpen className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'book' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-xs">Book</span>
+                  <BookOpen className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'book' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Book</span>
                 </button>
 
                 {/* Laptop Tile */}
                 <button
                   onClick={() => setMockupTemplate('laptop')}
-                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
                     mockupTemplate === 'laptop'
                       ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
                       : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <Laptop className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'laptop' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-xs">Laptop</span>
+                  <Laptop className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'laptop' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Laptop</span>
                 </button>
 
                 {/* Phone Tile */}
                 <button
                   onClick={() => setMockupTemplate('phone')}
-                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
                     mockupTemplate === 'phone'
                       ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
                       : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <Smartphone className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'phone' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-xs">Phone</span>
+                  <Smartphone className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'phone' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Phone</span>
                 </button>
 
                 {/* Tablet Tile */}
                 <button
                   onClick={() => setMockupTemplate('tablet')}
-                  className={`flex flex-col items-center justify-center py-4 rounded-xl border transition-all ${
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
                     mockupTemplate === 'tablet'
                       ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
                       : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
                   }`}
                 >
-                  <TabletIcon className={`w-5 h-5 mb-2 transition-colors ${mockupTemplate === 'tablet' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-xs">Tablet</span>
+                  <TabletIcon className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'tablet' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Tablet</span>
                 </button>
               </div>
             </div>
@@ -1035,7 +1151,7 @@ function App() {
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
                   />
-                ) : (
+                ) : mockupTemplate === 'tablet' ? (
                   <TabletMockup
                     ref={tabletMockupRef}
                     imageUrl={imageUrl}
@@ -1049,6 +1165,33 @@ function App() {
                     backgroundImage={backgroundImage}
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
+                  />
+                ) : (
+                  <WebinarMockup
+                    ref={webinarMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                    backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
+                    heading={webinarHeading}
+                    description={webinarDescription}
+                    headingColor={webinarHeadingColor}
+                    headingSize={webinarHeadingSize}
+                    descriptionColor={webinarDescriptionColor}
+                    descriptionSize={webinarDescriptionSize}
+                    showBadge={webinarShowBadge}
+                    badgeText={webinarBadgeText}
+                    badgeBgColor={webinarBadgeBgColor}
+                    badgeBorderColor={webinarBadgeBorderColor}
+                    badgeTextColor={webinarBadgeTextColor}
+                    badgeDotColor={webinarBadgeDotColor}
                   />
                 )}
               </div>
@@ -1145,11 +1288,278 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Webinar Details Card */}
+            {mockupTemplate === 'webinar' && (
+              <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
+                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                  <Tv className="w-3.5 h-3.5 mr-1.5 text-brand" />
+                  Webinar Settings
+                </h3>
+                
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                      Webinar Heading
+                    </label>
+                    <input
+                      type="text"
+                      value={webinarHeading}
+                      onChange={(e) => setWebinarHeading(e.target.value)}
+                      className="premium-input w-full"
+                      placeholder="Type heading..."
+                    />
+                  </div>
+
+                  {/* Heading Customization */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                        Heading Color
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
+                          <input
+                            type="color"
+                            value={webinarHeadingColor}
+                            onChange={(e) => setWebinarHeadingColor(e.target.value)}
+                            className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                          />
+                          <div 
+                            className="w-full h-full"
+                            style={{ backgroundColor: webinarHeadingColor }}
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={webinarHeadingColor}
+                          onChange={(e) => setWebinarHeadingColor(e.target.value)}
+                          className="premium-input w-full text-xs py-1 px-2 h-7"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex justify-between">
+                        <span>Heading Size</span>
+                        <span className="text-[9px] text-slate-400 font-normal">{webinarHeadingSize}px</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="16"
+                        max="72"
+                        value={webinarHeadingSize}
+                        onChange={(e) => setWebinarHeadingSize(parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                      <span>Webinar Description</span>
+                      <span className="text-[9px] text-slate-400 font-normal normal-case">
+                        {webinarDescription.length}/100
+                      </span>
+                    </label>
+                    <textarea
+                      value={webinarDescription}
+                      onChange={(e) => setWebinarDescription(e.target.value)}
+                      maxLength={100}
+                      className="premium-input w-full min-h-[80px] resize-y py-2"
+                      placeholder="Type description (optional)..."
+                    />
+                  </div>
+
+                  {/* Description Customization */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                        Description Color
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
+                          <input
+                            type="color"
+                            value={webinarDescriptionColor}
+                            onChange={(e) => setWebinarDescriptionColor(e.target.value)}
+                            className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                          />
+                          <div 
+                            className="w-full h-full"
+                            style={{ backgroundColor: webinarDescriptionColor }}
+                          />
+                        </div>
+                        <input
+                          type="text"
+                          value={webinarDescriptionColor}
+                          onChange={(e) => setWebinarDescriptionColor(e.target.value)}
+                          className="premium-input w-full text-xs py-1 px-2 h-7"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex justify-between">
+                        <span>Description Size</span>
+                        <span className="text-[9px] text-slate-400 font-normal">{webinarDescriptionSize}px</span>
+                      </label>
+                      <input
+                        type="range"
+                        min="10"
+                        max="32"
+                        value={webinarDescriptionSize}
+                        onChange={(e) => setWebinarDescriptionSize(parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Live Badge Customization */}
+                  <div className="border-t border-slate-200/60 dark:border-slate-800/80 pt-3 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={webinarShowBadge}
+                          onChange={(e) => setWebinarShowBadge(e.target.checked)}
+                          className="mr-2 rounded border-slate-300 dark:border-slate-700 text-brand focus:ring-brand"
+                        />
+                        Show Live Badge
+                      </label>
+                    </div>
+
+                    {webinarShowBadge && (
+                      <>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                            Badge Text
+                          </label>
+                          <input
+                            type="text"
+                            value={webinarBadgeText}
+                            onChange={(e) => setWebinarBadgeText(e.target.value)}
+                            className="premium-input w-full"
+                            placeholder="Live Webinar"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                              Badge Bg Color
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
+                                <input
+                                  type="color"
+                                  value={webinarBadgeBgColor.startsWith('rgba') ? '#d946ef' : webinarBadgeBgColor}
+                                  onChange={(e) => setWebinarBadgeBgColor(e.target.value)}
+                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                                />
+                                <div 
+                                  className="w-full h-full"
+                                  style={{ backgroundColor: webinarBadgeBgColor }}
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={webinarBadgeBgColor}
+                                onChange={(e) => setWebinarBadgeBgColor(e.target.value)}
+                                className="premium-input w-full text-xs py-1 px-2 h-7"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                              Badge Border
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
+                                <input
+                                  type="color"
+                                  value={webinarBadgeBorderColor.startsWith('rgba') ? '#d946ef' : webinarBadgeBorderColor}
+                                  onChange={(e) => setWebinarBadgeBorderColor(e.target.value)}
+                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                                />
+                                <div 
+                                  className="w-full h-full"
+                                  style={{ backgroundColor: webinarBadgeBorderColor }}
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={webinarBadgeBorderColor}
+                                onChange={(e) => setWebinarBadgeBorderColor(e.target.value)}
+                                className="premium-input w-full text-xs py-1 px-2 h-7"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                              Badge Text Color
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
+                                <input
+                                  type="color"
+                                  value={webinarBadgeTextColor}
+                                  onChange={(e) => setWebinarBadgeTextColor(e.target.value)}
+                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                                />
+                                <div 
+                                  className="w-full h-full"
+                                  style={{ backgroundColor: webinarBadgeTextColor }}
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={webinarBadgeTextColor}
+                                onChange={(e) => setWebinarBadgeTextColor(e.target.value)}
+                                className="premium-input w-full text-xs py-1 px-2 h-7"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                              Badge Dot Color
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
+                                <input
+                                  type="color"
+                                  value={webinarBadgeDotColor}
+                                  onChange={(e) => setWebinarBadgeDotColor(e.target.value)}
+                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                                />
+                                <div 
+                                  className="w-full h-full"
+                                  style={{ backgroundColor: webinarBadgeDotColor }}
+                                />
+                              </div>
+                              <input
+                                type="text"
+                                value={webinarBadgeDotColor}
+                                onChange={(e) => setWebinarBadgeDotColor(e.target.value)}
+                                className="premium-input w-full text-xs py-1 px-2 h-7"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right Column (Canvas Settings, Transform controls, Pro Tip) */}
           <div className="lg:col-span-3 flex flex-col gap-6">
-            
+
             {/* 1. Canvas settings card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
               <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
