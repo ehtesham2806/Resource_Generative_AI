@@ -92,10 +92,11 @@ function App() {
   const [webinarDescriptionSize, setWebinarDescriptionSize] = useState<number>(14);
   const [webinarShowBadge, setWebinarShowBadge] = useState<boolean>(true);
   const [webinarBadgeText, setWebinarBadgeText] = useState<string>('Live Webinar');
-  const [webinarBadgeBgColor, setWebinarBadgeBgColor] = useState<string>('rgba(217, 70, 239, 0.15)');
-  const [webinarBadgeBorderColor, setWebinarBadgeBorderColor] = useState<string>('rgba(217, 70, 239, 0.20)');
+  const [webinarBadgeBgColor, setWebinarBadgeBgColor] = useState<string>('#2b1133');
+  const [webinarBadgeBorderColor, setWebinarBadgeBorderColor] = useState<string>('#3b1547');
   const [webinarBadgeTextColor, setWebinarBadgeTextColor] = useState<string>('#d946ef');
   const [webinarBadgeDotColor, setWebinarBadgeDotColor] = useState<string>('#d946ef');
+  const [webinarShowDescription, setWebinarShowDescription] = useState<boolean>(true);
 
   const [exportScale, setExportScale] = useState<number>(1);
   const [isScaleDropdownOpen, setIsScaleDropdownOpen] = useState<boolean>(false);
@@ -193,10 +194,11 @@ function App() {
     setWebinarDescriptionSize(14);
     setWebinarShowBadge(true);
     setWebinarBadgeText('Live Webinar');
-    setWebinarBadgeBgColor('rgba(217, 70, 239, 0.15)');
-    setWebinarBadgeBorderColor('rgba(217, 70, 239, 0.20)');
+    setWebinarBadgeBgColor('#2b1133');
+    setWebinarBadgeBorderColor('#3b1547');
     setWebinarBadgeTextColor('#d946ef');
     setWebinarBadgeDotColor('#d946ef');
+    setWebinarShowDescription(true);
   };
 
   const handleBrandChange = (brandKey: string) => {
@@ -663,7 +665,7 @@ function App() {
         pixelRatio: 2 * exportScale,
         filter: (element) => {
           if (element instanceof HTMLElement) {
-            return !element.classList.contains('animate-spin');
+            return !element.classList.contains('animate-spin') && !element.classList.contains('mockup-popover-exclude');
           }
           return true;
         },
@@ -1192,6 +1194,20 @@ function App() {
                     badgeBorderColor={webinarBadgeBorderColor}
                     badgeTextColor={webinarBadgeTextColor}
                     badgeDotColor={webinarBadgeDotColor}
+                    onHeadingChange={setWebinarHeading}
+                    onHeadingColorChange={setWebinarHeadingColor}
+                    onHeadingSizeChange={setWebinarHeadingSize}
+                    onDescriptionChange={setWebinarDescription}
+                    onDescriptionColorChange={setWebinarDescriptionColor}
+                    onDescriptionSizeChange={setWebinarDescriptionSize}
+                    onBadgeTextChange={setWebinarBadgeText}
+                    onBadgeBgColorChange={setWebinarBadgeBgColor}
+                    onBadgeBorderColorChange={setWebinarBadgeBorderColor}
+                    onBadgeTextColorChange={setWebinarBadgeTextColor}
+                    onBadgeDotColorChange={setWebinarBadgeDotColor}
+                    onShowBadgeChange={setWebinarShowBadge}
+                    showDescription={webinarShowDescription}
+                    onShowDescriptionChange={setWebinarShowDescription}
                   />
                 )}
               </div>
@@ -1288,273 +1304,6 @@ function App() {
                 </div>
               </div>
             </div>
-
-            {/* Webinar Details Card */}
-            {mockupTemplate === 'webinar' && (
-              <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
-                  <Tv className="w-3.5 h-3.5 mr-1.5 text-brand" />
-                  Webinar Settings
-                </h3>
-                
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                      Webinar Heading
-                    </label>
-                    <input
-                      type="text"
-                      value={webinarHeading}
-                      onChange={(e) => setWebinarHeading(e.target.value)}
-                      className="premium-input w-full"
-                      placeholder="Type heading..."
-                    />
-                  </div>
-
-                  {/* Heading Customization */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                        Heading Color
-                      </label>
-                      <div className="flex items-center space-x-2">
-                        <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
-                          <input
-                            type="color"
-                            value={webinarHeadingColor}
-                            onChange={(e) => setWebinarHeadingColor(e.target.value)}
-                            className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                          />
-                          <div 
-                            className="w-full h-full"
-                            style={{ backgroundColor: webinarHeadingColor }}
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          value={webinarHeadingColor}
-                          onChange={(e) => setWebinarHeadingColor(e.target.value)}
-                          className="premium-input w-full text-xs py-1 px-2 h-7"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex justify-between">
-                        <span>Heading Size</span>
-                        <span className="text-[9px] text-slate-400 font-normal">{webinarHeadingSize}px</span>
-                      </label>
-                      <input
-                        type="range"
-                        min="16"
-                        max="72"
-                        value={webinarHeadingSize}
-                        onChange={(e) => setWebinarHeadingSize(parseInt(e.target.value))}
-                        className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand mt-2"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex items-center justify-between">
-                      <span>Webinar Description</span>
-                      <span className="text-[9px] text-slate-400 font-normal normal-case">
-                        {webinarDescription.length}/100
-                      </span>
-                    </label>
-                    <textarea
-                      value={webinarDescription}
-                      onChange={(e) => setWebinarDescription(e.target.value)}
-                      maxLength={100}
-                      className="premium-input w-full min-h-[80px] resize-y py-2"
-                      placeholder="Type description (optional)..."
-                    />
-                  </div>
-
-                  {/* Description Customization */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                        Description Color
-                      </label>
-                      <div className="flex items-center space-x-2">
-                        <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
-                          <input
-                            type="color"
-                            value={webinarDescriptionColor}
-                            onChange={(e) => setWebinarDescriptionColor(e.target.value)}
-                            className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                          />
-                          <div 
-                            className="w-full h-full"
-                            style={{ backgroundColor: webinarDescriptionColor }}
-                          />
-                        </div>
-                        <input
-                          type="text"
-                          value={webinarDescriptionColor}
-                          onChange={(e) => setWebinarDescriptionColor(e.target.value)}
-                          className="premium-input w-full text-xs py-1 px-2 h-7"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5 flex justify-between">
-                        <span>Description Size</span>
-                        <span className="text-[9px] text-slate-400 font-normal">{webinarDescriptionSize}px</span>
-                      </label>
-                      <input
-                        type="range"
-                        min="10"
-                        max="32"
-                        value={webinarDescriptionSize}
-                        onChange={(e) => setWebinarDescriptionSize(parseInt(e.target.value))}
-                        className="w-full h-1 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand mt-2"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Live Badge Customization */}
-                  <div className="border-t border-slate-200/60 dark:border-slate-800/80 pt-3 flex flex-col gap-3">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={webinarShowBadge}
-                          onChange={(e) => setWebinarShowBadge(e.target.checked)}
-                          className="mr-2 rounded border-slate-300 dark:border-slate-700 text-brand focus:ring-brand"
-                        />
-                        Show Live Badge
-                      </label>
-                    </div>
-
-                    {webinarShowBadge && (
-                      <>
-                        <div>
-                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                            Badge Text
-                          </label>
-                          <input
-                            type="text"
-                            value={webinarBadgeText}
-                            onChange={(e) => setWebinarBadgeText(e.target.value)}
-                            className="premium-input w-full"
-                            placeholder="Live Webinar"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                              Badge Bg Color
-                            </label>
-                            <div className="flex items-center space-x-2">
-                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
-                                <input
-                                  type="color"
-                                  value={webinarBadgeBgColor.startsWith('rgba') ? '#d946ef' : webinarBadgeBgColor}
-                                  onChange={(e) => setWebinarBadgeBgColor(e.target.value)}
-                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                                />
-                                <div 
-                                  className="w-full h-full"
-                                  style={{ backgroundColor: webinarBadgeBgColor }}
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                value={webinarBadgeBgColor}
-                                onChange={(e) => setWebinarBadgeBgColor(e.target.value)}
-                                className="premium-input w-full text-xs py-1 px-2 h-7"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                              Badge Border
-                            </label>
-                            <div className="flex items-center space-x-2">
-                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
-                                <input
-                                  type="color"
-                                  value={webinarBadgeBorderColor.startsWith('rgba') ? '#d946ef' : webinarBadgeBorderColor}
-                                  onChange={(e) => setWebinarBadgeBorderColor(e.target.value)}
-                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                                />
-                                <div 
-                                  className="w-full h-full"
-                                  style={{ backgroundColor: webinarBadgeBorderColor }}
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                value={webinarBadgeBorderColor}
-                                onChange={(e) => setWebinarBadgeBorderColor(e.target.value)}
-                                className="premium-input w-full text-xs py-1 px-2 h-7"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                              Badge Text Color
-                            </label>
-                            <div className="flex items-center space-x-2">
-                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
-                                <input
-                                  type="color"
-                                  value={webinarBadgeTextColor}
-                                  onChange={(e) => setWebinarBadgeTextColor(e.target.value)}
-                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                                />
-                                <div 
-                                  className="w-full h-full"
-                                  style={{ backgroundColor: webinarBadgeTextColor }}
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                value={webinarBadgeTextColor}
-                                onChange={(e) => setWebinarBadgeTextColor(e.target.value)}
-                                className="premium-input w-full text-xs py-1 px-2 h-7"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
-                              Badge Dot Color
-                            </label>
-                            <div className="flex items-center space-x-2">
-                              <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0">
-                                <input
-                                  type="color"
-                                  value={webinarBadgeDotColor}
-                                  onChange={(e) => setWebinarBadgeDotColor(e.target.value)}
-                                  className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                                />
-                                <div 
-                                  className="w-full h-full"
-                                  style={{ backgroundColor: webinarBadgeDotColor }}
-                                />
-                              </div>
-                              <input
-                                type="text"
-                                value={webinarBadgeDotColor}
-                                onChange={(e) => setWebinarBadgeDotColor(e.target.value)}
-                                className="premium-input w-full text-xs py-1 px-2 h-7"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Right Column (Canvas Settings, Transform controls, Pro Tip) */}

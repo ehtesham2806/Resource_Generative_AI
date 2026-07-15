@@ -112,3 +112,27 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: #2b2b54;
 }
 
+[contenteditable="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+[contenteditable="true"]:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+[contenteditable="true"].is-empty::before {
+  content: attr(data-placeholder);
+  color: inherit;
+  opacity: 0.4;
+  pointer-events: none;
+  display: block;
+}
+
+[contenteditable="true"].is-empty:focus::before,
+[contenteditable="true"].is-empty:focus-within::before {
+  display: none !important;
+}
+
