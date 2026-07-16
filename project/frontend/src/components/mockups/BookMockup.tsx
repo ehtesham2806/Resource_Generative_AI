@@ -9,6 +9,7 @@ interface BookMockupProps {
   coverPosition?: string;
   coverLeft?: string;
   coverScale?: number;
+  frameVerticalOffset?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -24,6 +25,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
+    frameVerticalOffset = 0,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -44,7 +46,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
           boxSizing: 'border-box'
         }}
       >
-        <div className='w-full relative max-w-[300px] mx-auto book-main-div'>
+        <div className='w-full relative max-w-[300px] mx-auto book-main-div' style={{ position: 'relative', top: `${frameVerticalOffset}px` }}>
           {/* Book base image */}
         <img
           src="/Book.png"

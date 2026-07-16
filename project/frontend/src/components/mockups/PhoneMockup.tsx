@@ -8,6 +8,7 @@ interface PhoneMockupProps {
   coverPosition?: string;
   coverLeft?: string;
   coverScale?: number;
+  frameVerticalOffset?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -23,6 +24,7 @@ const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
+    frameVerticalOffset = 0,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -48,6 +50,7 @@ const PhoneMockup = forwardRef<HTMLDivElement, PhoneMockupProps>(
         {/* Smartphone Device container */}
         <div 
           className="relative h-[90%] aspect-[1061/1408] phone-container"
+          style={{ position: 'relative', top: `${frameVerticalOffset}px` }}
         >
           {/* Phone base image */}
           <img

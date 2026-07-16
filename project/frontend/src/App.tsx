@@ -24,6 +24,7 @@ import {
   Check,
   Sun,
   Moon,
+  MoveVertical,
 } from 'lucide-react';
 import LaptopMockup from './components/mockups/LaptopMockup.tsx';
 import BookMockup from './components/mockups/BookMockup.tsx';
@@ -75,6 +76,7 @@ function App() {
   const [coverPosition, setCoverPosition] = useState<string>('0px');
   const [coverLeft, setCoverLeft] = useState<string>('0px');
   const [coverScale, setCoverScale] = useState<number>(1.0);
+  const [frameVerticalOffset, setFrameVerticalOffset] = useState<number>(0);
   const [outputWidth, setOutputWidth] = useState<number>(1200);
   const [outputHeight, setOutputHeight] = useState<number>(800);
   const [backgroundColor, setBackgroundColor] = useState<string>('#0b0b18');
@@ -1118,6 +1120,7 @@ function App() {
                     backgroundImage={backgroundImage}
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
+                    frameVerticalOffset={frameVerticalOffset}
                   />
                 ) : mockupTemplate === 'book' ? (
                   <BookMockup
@@ -1133,6 +1136,7 @@ function App() {
                     coverScale={coverScale}
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
+                    frameVerticalOffset={frameVerticalOffset}
                   />
                 ) : mockupTemplate === 'phone' ? (
                   <PhoneMockup
@@ -1148,6 +1152,7 @@ function App() {
                     backgroundImage={backgroundImage}
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
+                    frameVerticalOffset={frameVerticalOffset}
                   />
                 ) : mockupTemplate === 'tablet' ? (
                   <TabletMockup
@@ -1163,6 +1168,7 @@ function App() {
                     backgroundImage={backgroundImage}
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
+                    frameVerticalOffset={frameVerticalOffset}
                   />
                 ) : (
                   <WebinarMockup
@@ -1532,6 +1538,29 @@ function App() {
                     className="slider-gradient-track mt-1"
                   />
                 </div>
+
+                {/* Frame Position slider - only for device mockups */}
+                {(mockupTemplate === 'laptop' || mockupTemplate === 'book' || mockupTemplate === 'phone' || mockupTemplate === 'tablet') && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider flex items-center">
+                        <MoveVertical className="w-3 h-3 mr-1 text-brand" />
+                        Frame Position
+                      </span>
+                      <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
+                        {frameVerticalOffset}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="-200"
+                      max="200"
+                      value={frameVerticalOffset}
+                      onChange={(e) => setFrameVerticalOffset(parseInt(e.target.value))}
+                      className="slider-gradient-track mt-1"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 

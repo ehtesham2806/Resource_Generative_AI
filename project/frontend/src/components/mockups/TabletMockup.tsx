@@ -8,6 +8,7 @@ interface TabletMockupProps {
   coverPosition?: string;
   coverLeft?: string;
   coverScale?: number;
+  frameVerticalOffset?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -23,6 +24,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
+    frameVerticalOffset = 0,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -47,8 +49,8 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
 
         {/* Tablet Device container */}
         <div 
-          className="relative h-[88%] aspect-[1/1.38] rounded-[32px] border-[14px] border-[#181826] bg-[#0c0c1b] shadow-[0_25px_65px_-15px_rgba(0,0,0,0.85),_0_0_50px_rgba(6,182,212,0.06)] flex flex-col overflow-hidden"
-          style={{ boxSizing: 'border-box' }}
+          className="relative h-[88%] aspect-[1/1.38] rounded-[12px] border-[6px] border-[#181826] bg-[#0c0c1b] shadow-[0_25px_65px_-15px_rgba(0,0,0,0.85),_0_0_50px_rgba(6,182,212,0.06)] flex flex-col overflow-hidden"
+          style={{ boxSizing: 'border-box', position: 'relative', top: `${frameVerticalOffset}px` }}
         >
           {/* Top Camera Dot */}
           <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[8px] h-[8px] rounded-full bg-[#08080f] z-30 flex items-center justify-center shadow-inner">
@@ -57,7 +59,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
 
           {/* Screen area */}
           <div
-            className="relative w-full h-full overflow-hidden rounded-[18px]"
+            className="relative w-full h-full overflow-hidden rounded-[8px]"
             style={{ backgroundColor: dominantColor || '#0c0c1d' }}
           >
             {isLoading ? (
