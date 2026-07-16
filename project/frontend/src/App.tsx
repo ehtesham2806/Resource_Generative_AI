@@ -32,6 +32,7 @@ import PhoneMockup from './components/mockups/PhoneMockup.tsx';
 import TabletMockup from './components/mockups/TabletMockup.tsx';
 import DefaultMockup from './components/mockups/DefaultMockup.tsx';
 import WebinarMockup from './components/mockups/WebinarMockup.tsx';
+import GuideMockup from './components/mockups/GuideMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
 import * as htmlToImage from 'html-to-image';
@@ -71,6 +72,7 @@ function App() {
   const phoneMockupRef = useRef<HTMLDivElement>(null);
   const tabletMockupRef = useRef<HTMLDivElement>(null);
   const webinarMockupRef = useRef<HTMLDivElement>(null);
+  const guideMockupRef = useRef<HTMLDivElement>(null);
   
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [coverPosition, setCoverPosition] = useState<string>('0px');
@@ -99,6 +101,14 @@ function App() {
   const [webinarBadgeTextColor, setWebinarBadgeTextColor] = useState<string>('#d946ef');
   const [webinarBadgeDotColor, setWebinarBadgeDotColor] = useState<string>('#d946ef');
   const [webinarShowDescription, setWebinarShowDescription] = useState<boolean>(true);
+
+  const [guideHeading, setGuideHeading] = useState<string>('The Complete Beginner\'s Guide to Better Design');
+  const [guideDescription, setGuideDescription] = useState<string>('Learn the fundamentals of visual hierarchy, typography, and layout to create stunning designs.');
+  const [guideHeadingColor, setGuideHeadingColor] = useState<string>('#1e293b');
+  const [guideHeadingSize, setGuideHeadingSize] = useState<number>(36);
+  const [guideDescriptionColor, setGuideDescriptionColor] = useState<string>('#64748b');
+  const [guideDescriptionSize, setGuideDescriptionSize] = useState<number>(14);
+  const [guideShowDescription, setGuideShowDescription] = useState<boolean>(true);
 
   const [exportScale, setExportScale] = useState<number>(1);
   const [isScaleDropdownOpen, setIsScaleDropdownOpen] = useState<boolean>(false);
@@ -226,6 +236,8 @@ function App() {
       await downloadTabletMockup();
     } else if (mockupTemplate === 'webinar') {
       await downloadWebinarMockup();
+    } else if (mockupTemplate === 'guide') {
+      await downloadGuideMockup();
     }
   };
 
@@ -713,6 +725,78 @@ function App() {
     }
   };
 
+  const downloadGuideMockup = async () => {
+    if (!guideMockupRef.current || !imageUrl) return;
+
+    try {
+      setIsDownloading(true);
+
+      const images = guideMockupRef.current.querySelectorAll(
+        'img'
+      ) as NodeListOf<HTMLImageElement>;
+
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      const canvas = await htmlToImage.toCanvas(guideMockupRef.current, {
+        backgroundColor: undefined,
+        pixelRatio: 2 * exportScale,
+        filter: (element) => {
+          if (element instanceof HTMLElement) {
+            return !element.classList.contains('animate-spin') && !element.classList.contains('mockup-popover-exclude');
+          }
+          return true;
+        },
+      });
+
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
+
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
+      const link = document.createElement('a');
+      link.download = `guide-mockup-${Date.now()}-${exportScale}x.png`;
+      link.href = finalCanvas.toDataURL('image/png');
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Guide download failed:', error);
+      setError('Guide download failed. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   // Color preset quick selects
   const colorPresets = [
     { name: 'Ink', value: '#0b0b18' },
@@ -943,6 +1027,19 @@ function App() {
                   <TabletIcon className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'tablet' ? 'text-white' : 'text-brand'}`} />
                   <span className="text-[10px]">Tablet</span>
                 </button>
+
+                {/* Guide Tile */}
+                <button
+                  onClick={() => setMockupTemplate('guide')}
+                  className={`col-span-1 flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
+                    mockupTemplate === 'guide'
+                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
+                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
+                  }`}
+                >
+                  <FileText className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'guide' ? 'text-white' : 'text-brand'}`} />
+                  <span className="text-[10px]">Guide</span>
+                </button>
               </div>
             </div>
 
@@ -1170,7 +1267,7 @@ function App() {
                     outputHeight={outputHeight}
                     frameVerticalOffset={frameVerticalOffset}
                   />
-                ) : (
+                ) : mockupTemplate === 'webinar' ? (
                   <WebinarMockup
                     ref={webinarMockupRef}
                     imageUrl={imageUrl}
@@ -1210,6 +1307,35 @@ function App() {
                     onShowBadgeChange={setWebinarShowBadge}
                     showDescription={webinarShowDescription}
                     onShowDescriptionChange={setWebinarShowDescription}
+                  />
+                ) : (
+                  <GuideMockup
+                    ref={guideMockupRef}
+                    imageUrl={imageUrl}
+                    isLoading={isLoading}
+                    dominantColor={dominantColor}
+                    objectFit={objectFit}
+                    coverPosition={coverPosition}
+                    coverLeft={coverLeft}
+                    coverScale={coverScale}
+                    backgroundColor={backgroundColor}
+                    backgroundImage={backgroundImage}
+                    outputWidth={outputWidth}
+                    outputHeight={outputHeight}
+                    heading={guideHeading}
+                    description={guideDescription}
+                    headingColor={guideHeadingColor}
+                    headingSize={guideHeadingSize}
+                    descriptionColor={guideDescriptionColor}
+                    descriptionSize={guideDescriptionSize}
+                    showDescription={guideShowDescription}
+                    onHeadingChange={setGuideHeading}
+                    onHeadingColorChange={setGuideHeadingColor}
+                    onHeadingSizeChange={setGuideHeadingSize}
+                    onDescriptionChange={setGuideDescription}
+                    onDescriptionColorChange={setGuideDescriptionColor}
+                    onDescriptionSizeChange={setGuideDescriptionSize}
+                    onShowDescriptionChange={setGuideShowDescription}
                   />
                 )}
               </div>
