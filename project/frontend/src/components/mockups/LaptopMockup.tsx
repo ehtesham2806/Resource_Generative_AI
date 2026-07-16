@@ -45,7 +45,7 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
           <div className="relative w-full">
             {/* Laptop base image */}
             <img
-              src="/Lapi.png"
+              src="/Laptop.png"
               alt="Laptop mockup"
               className="w-full h-auto"
             />

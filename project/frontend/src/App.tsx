@@ -751,16 +751,12 @@ function App() {
       {/* Modern Top Header */}
       <header className="border-b border-slate-200 dark:border-[#1c1c38] bg-white/80 dark:bg-[#090915]/80 backdrop-blur-md sticky top-0 z-40 transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 rounded-xl shadow-[0_4px_15px_rgba(168,85,247,0.3)]">
-              <Monitor className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex items-center space-x-1.5">
-              <h1 className="text-lg font-bold tracking-tight text-slate-900 dark:text-white font-['Outfit']">
-                AI Display Studio
-              </h1>
-              <Sparkles className="w-4 h-4 text-brand animate-pulse" />
-            </div>
+          <div className="flex items-center">
+              <img 
+                src={theme === 'dark' ? '/Logo/logo_white.svg' : '/Logo/logo.svg'} 
+                alt="Craftora Logo" 
+                className="h-8"
+              />
           </div>
 
           <div className="flex items-center space-x-5">
@@ -856,7 +852,7 @@ function App() {
             
             {/* 1. Templates selector card */}
             <div className="premium-card rounded-2xl p-4">
-              <h3 className="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center">
+              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center">
                 <Monitor className="w-3 h-3 mr-1.5 text-brand" />
                 Templates
               </h3>
@@ -950,7 +946,7 @@ function App() {
 
             {/* 2. Source file card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
                 <Download className="w-3.5 h-3.5 mr-1.5 text-brand transform rotate-180" />
                 Source File
               </h3>
@@ -991,7 +987,7 @@ function App() {
 
             {/* 3. Capabilities Checklist card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
                 <Zap className="w-3 h-3 mr-1.5 text-brand" />
                 Capabilities
               </h3>
@@ -1311,14 +1307,14 @@ function App() {
 
             {/* 1. Canvas settings card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
                 <Sliders className="w-3.5 h-3.5 mr-1.5 text-brand" />
                 Canvas
               </h3>
 
               {/* Brand Selector Dropdown */}
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Brand Preset</span>
                 </label>
                 <SearchableBrandDropdown
@@ -1329,7 +1325,7 @@ function App() {
 
               {/* Background Color Picker Input */}
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                   Background
                 </label>
                 <div className="flex items-center space-x-3">
@@ -1371,7 +1367,7 @@ function App() {
 
               {/* Background Image Input */}
               <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
                   <span>Background Image</span>
                   {backgroundImage && (
                     <button
@@ -1413,7 +1409,7 @@ function App() {
               {/* Output Dimension Inputs */}
               <div className="grid grid-cols-2 gap-3.5">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                     Width
                   </label>
                   <input
@@ -1429,7 +1425,7 @@ function App() {
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                     Height
                   </label>
                   <input
@@ -1476,7 +1472,7 @@ function App() {
 
             {/* 2. Transform Sliders card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-5">
-              <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center">
+              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
                 <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-brand" />
                 Transform
               </h3>
@@ -1485,7 +1481,7 @@ function App() {
                 {/* Vertical position slider */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
                     <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
                       {coverPosition}
                     </span>
@@ -1503,7 +1499,7 @@ function App() {
                 {/* Horizontal position slider */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
                     <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
                       {coverLeft}
                     </span>
@@ -1521,7 +1517,7 @@ function App() {
                 {/* Zoom slider */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
+                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
                     <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
                       {coverScale.toFixed(2)}x
                     </span>
@@ -1565,7 +1561,7 @@ function App() {
       {/* Crafted Footer */}
       <footer className="border-t border-slate-200 dark:border-[#1c1c38] bg-slate-100 dark:bg-[#05050d] py-6 transition-colors duration-300">
         <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center text-[11px] text-slate-600 dark:text-slate-500 font-semibold tracking-wide">
-          <p>© 2025 AI Display Studio · Crafted with Python + React</p>
+          <p>© 2025 Craftora · Crafted with Python + React</p>
         </div>
       </footer>
     </div>

@@ -108,7 +108,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
 
                 <div className="mb-8 text-center z-10">
                   <h4 className="text-xs font-semibold text-white/60 tracking-widest uppercase mb-1">
-                    AI Display Studio
+                    Craftora
                   </h4>
                   <p className="text-[10px] text-white/80">
                     Tablet Screen Preview
