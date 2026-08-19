@@ -58,6 +58,13 @@ function App() {
   }, [theme]);
 
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [originalImageUrl, setOriginalImageUrl] = useState<string>('');
+  const [ocrResults, setOcrResults] = useState<any[]>([]);
+  const [activeEdits, setActiveEdits] = useState<any[]>([]);
+  const [isEditingText, setIsEditingText] = useState<boolean>(false);
+  const [isApplyingEdits, setIsApplyingEdits] = useState<boolean>(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTextVal, setEditingTextVal] = useState<string>('');
   const [dominantColor, setDominantColor] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
@@ -152,6 +159,10 @@ function App() {
     setFileName(file.name);
     setError('');
     setDominantColor('');
+    setOriginalImageUrl('');
+    setOcrResults([]);
+    setActiveEdits([]);
+    setIsEditingText(false);
 
     try {
       const formData = new FormData();
@@ -169,10 +180,14 @@ function App() {
 
       if (data.success) {
         setImageUrl(data.image_data);
+        setOriginalImageUrl(data.image_data);
         setDominantColor(data.dominant_color || '#1a1a2e');
         if (data.image_size) {
           setImageWidth(data.image_size.width);
           setImageHeight(data.image_size.height);
+        }
+        if (data.ocr_results && data.ocr_results.length > 0) {
+          setOcrResults(data.ocr_results);
         }
       } else {
         throw new Error(data.detail || 'Unknown error');
@@ -186,8 +201,47 @@ function App() {
     }
   };
 
+  const handleApplyEdits = async (editsToApply = activeEdits, autoContinue = false) => {
+    if (!originalImageUrl) return;
+    setIsApplyingEdits(true);
+    try {
+      const response = await fetch('http://localhost:8000/edit-image-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          image_data: originalImageUrl,
+          edits: editsToApply,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setImageUrl(data.image_data);
+        if (autoContinue) {
+          setIsEditingText(false);
+        }
+      } else {
+        throw new Error(data.detail || 'Failed to edit image text');
+      }
+    } catch (err: any) {
+      console.error('Error applying edits:', err);
+      setError(err.message || 'Error applying edits');
+    } finally {
+      setIsApplyingEdits(false);
+    }
+  };
+
   const handleReset = () => {
     setImageUrl('');
+    setOriginalImageUrl('');
+    setOcrResults([]);
+    setActiveEdits([]);
+    setIsEditingText(false);
+    setIsApplyingEdits(false);
+    setEditingId(null);
+    setEditingTextVal('');
     setFileName('');
     setIsLoading(false);
     setError('');
@@ -895,6 +949,17 @@ function App() {
               )}
             </button>
 
+            {imageUrl && ocrResults.length > 0 && (
+              <button
+                onClick={() => setIsEditingText(true)}
+                className="flex items-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-[#151532] dark:hover:bg-[#1e1e48] border border-indigo-150 dark:border-[#2b2b54] text-brand dark:text-indigo-300 font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99]"
+                title="Edit or Remove Image Text Content via OCR"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>Edit Image Text</span>
+              </button>
+            )}
+
             <div className="flex items-stretch relative" ref={headerScaleDropdownRef}>
               <button
                 onClick={handleDownload}
@@ -1075,13 +1140,24 @@ function App() {
                       {fileName}
                     </span>
                   </div>
-                  <button
-                    onClick={handleReset}
-                    className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group flex-shrink-0"
-                    title="Reset File"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-brand group-hover:text-indigo-600 dark:group-hover:text-white transition-colors" />
-                  </button>
+                  <div className="flex items-center space-x-1.5 flex-shrink-0">
+                    {ocrResults.length > 0 && (
+                      <button
+                        onClick={() => setIsEditingText(true)}
+                        className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group"
+                        title="Edit Detected Text"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-brand group-hover:text-indigo-600 dark:group-hover:text-white transition-colors" />
+                      </button>
+                    )}
+                    <button
+                      onClick={handleReset}
+                      className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group"
+                      title="Reset File"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-brand group-hover:text-indigo-600 dark:group-hover:text-white transition-colors" />
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -1869,6 +1945,282 @@ function App() {
           <p>© 2025 Craftora · Crafted with Python + React</p>
         </div>
       </footer>
+
+      {/* OCR Text Editing Modal Popup */}
+      {isEditingText && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300">
+          <div className="bg-white dark:bg-[#0c0c1c] border border-slate-200 dark:border-[#1c1c38] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-6 gap-5">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#1a1a32]">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white font-['Outfit'] flex items-center">
+                  <Zap className="w-5 h-5 mr-2 text-brand" />
+                  OCR Text Editor Step
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  Detect, remove or edit text from your source document page before generating mockup creatives.
+                </p>
+              </div>
+              <button 
+                onClick={() => {
+                  setImageUrl(originalImageUrl);
+                  setActiveEdits([]);
+                  setIsEditingText(false);
+                }}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-semibold p-1.5 hover:bg-slate-100 dark:hover:bg-[#181836] rounded-xl transition-all"
+              >
+                Skip OCR
+              </button>
+            </div>
+            
+            {/* Modal Body: Split view */}
+            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-6">
+              {/* Left Side: Interactive Preview */}
+              <div className="flex-1 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950/40 rounded-2xl p-4 border border-slate-200 dark:border-[#1c1c38] relative overflow-hidden">
+                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 w-full text-left flex items-center">
+                  <ImageIcon className="w-4 h-4 mr-1.5 text-brand" />
+                  Interactive Image Map
+                </h4>
+                <div className="relative max-w-full max-h-[380px] flex items-center justify-center select-none" style={{ aspectRatio: `${imageWidth}/${imageHeight}` }}>
+                  <img 
+                    src={originalImageUrl} 
+                    alt="Original for OCR" 
+                    className="max-w-full max-h-[330px] object-contain rounded-lg shadow-md"
+                  />
+                  {/* Bounding box overlays */}
+                  {ocrResults.map((item) => {
+                    const xs = item.box.map((pt: any) => pt[0]);
+                    const ys = item.box.map((pt: any) => pt[1]);
+                    const minX = Math.min(...xs);
+                    const minY = Math.min(...ys);
+                    const maxX = Math.max(...xs);
+                    const maxY = Math.max(...ys);
+                    
+                    const left = (minX / imageWidth) * 100;
+                    const top = (minY / imageHeight) * 100;
+                    const width = ((maxX - minX) / imageWidth) * 100;
+                    const height = ((maxY - minY) / imageHeight) * 100;
+                    
+                    const edit = activeEdits.find(e => e.id === item.id);
+                    const isRemoved = edit?.action === 'remove';
+                    const isEdited = edit?.action === 'replace';
+                    
+                    let borderClass = "border-indigo-500/50 hover:border-indigo-400 hover:bg-indigo-500/10";
+                    if (isRemoved) borderClass = "border-red-500/80 bg-red-500/15 hover:border-red-400";
+                    if (isEdited) borderClass = "border-emerald-500/80 bg-emerald-500/15 hover:border-emerald-400";
+                    
+                    return (
+                      <div 
+                        key={item.id}
+                        className={`absolute border rounded cursor-pointer transition-all flex items-center justify-center ${borderClass}`}
+                        style={{
+                          left: `${left}%`,
+                          top: `${top}%`,
+                          width: `${width}%`,
+                          height: `${height}%`,
+                          transform: `rotate(${item.angle}deg)`,
+                          transformOrigin: 'center',
+                        }}
+                        title={`Original: "${item.text}"`}
+                        onClick={() => {
+                          setEditingId(item.id);
+                          setEditingTextVal(isEdited ? edit.new_text : item.text);
+                        }}
+                      >
+                        {isRemoved && <span className="text-[8px] font-bold text-red-400 bg-slate-900/85 px-1 py-0.5 rounded leading-none font-mono">X</span>}
+                        {isEdited && <span className="text-[8px] font-bold text-emerald-400 bg-slate-900/85 px-1 py-0.5 rounded leading-none font-mono">✓</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 text-center">
+                  Hover over bounding boxes to see original text. Click any box to edit or remove it.
+                </p>
+              </div>
+              
+              {/* Right Side: Text lines list & edits */}
+              <div className="w-full md:w-80 flex flex-col gap-4 min-h-0">
+                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                  <span>Detected Text Regions ({ocrResults.length})</span>
+                </h4>
+                <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 max-h-[350px]">
+                  {ocrResults.map((item) => {
+                    const edit = activeEdits.find(e => e.id === item.id);
+                    const isRemoved = edit?.action === 'remove';
+                    const isEdited = edit?.action === 'replace';
+                    
+                    if (editingId === item.id) {
+                      return (
+                        <div key={item.id} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-indigo-50/50 dark:bg-[#1a1a36] border border-indigo-200 dark:border-indigo-850">
+                          <span className="text-[10px] text-slate-500 font-semibold uppercase">Edit Text content</span>
+                          <input 
+                            type="text" 
+                            value={editingTextVal} 
+                            onChange={(e) => setEditingTextVal(e.target.value)} 
+                            className="premium-input text-xs w-full py-1 px-2"
+                            autoFocus
+                          />
+                          <div className="flex items-center space-x-1.5 justify-end mt-1">
+                            <button 
+                              onClick={() => {
+                                const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                updatedEdits.push({
+                                  id: item.id,
+                                  box: item.box,
+                                  action: 'replace',
+                                  new_text: editingTextVal,
+                                  original_text: item.text,
+                                  angle: item.angle,
+                                  color: item.color,
+                                  width: item.width,
+                                  height: item.height
+                                });
+                                setActiveEdits(updatedEdits);
+                                setEditingId(null);
+                              }}
+                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                            >
+                              Save
+                            </button>
+                            <button 
+                              onClick={() => setEditingId(null)}
+                              className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    }
+                    
+                    return (
+                      <div key={item.id} className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                        isRemoved 
+                          ? 'bg-red-500/10 border-red-500/20' 
+                          : isEdited 
+                          ? 'bg-emerald-500/10 border-emerald-500/20' 
+                          : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/50 dark:border-[#171732]'
+                      }`}>
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <span className={`text-xs font-medium text-slate-750 dark:text-slate-200 truncate ${isRemoved ? 'line-through opacity-50' : ''}`}>
+                            {isEdited ? edit.new_text : item.text}
+                          </span>
+                          {isEdited && (
+                            <span className="text-[9px] text-slate-400 line-through truncate">
+                              orig: {item.text}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-1 flex-shrink-0">
+                          <button
+                            onClick={() => {
+                              setEditingId(item.id);
+                              setEditingTextVal(isEdited ? edit.new_text : item.text);
+                            }}
+                            disabled={isRemoved}
+                            className="px-2 py-1 text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-[#181836] dark:hover:bg-[#202048] text-brand rounded-lg border border-indigo-100 dark:border-[#2b2b54] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              const exists = activeEdits.find(e => e.id === item.id);
+                              if (exists && exists.action === 'remove') {
+                                setActiveEdits(activeEdits.filter(e => e.id !== item.id));
+                              } else {
+                                const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                updatedEdits.push({
+                                  id: item.id,
+                                  box: item.box,
+                                  action: 'remove',
+                                  original_text: item.text
+                                });
+                                setActiveEdits(updatedEdits);
+                              }
+                            }}
+                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+                              isRemoved 
+                                ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/30 text-amber-500 border-amber-200/50 dark:border-amber-900/50' 
+                                : 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30 text-red-500 border-red-200/50 dark:border-red-900/50'
+                            }`}
+                          >
+                            {isRemoved ? 'Undo' : 'Remove'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Modal actions sidebar bottom */}
+                <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const allRemoves = ocrResults.map(item => ({
+                          id: item.id,
+                          box: item.box,
+                          action: 'remove',
+                          original_text: item.text
+                        }));
+                        setActiveEdits(allRemoves);
+                      }}
+                      className="flex-1 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                    >
+                      Remove All Text
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setActiveEdits([]);
+                        setImageUrl(originalImageUrl);
+                      }}
+                      className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-lg transition-colors"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Modal Footer */}
+            <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3.5 flex items-center justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setImageUrl(originalImageUrl);
+                  setActiveEdits([]);
+                  setIsEditingText(false);
+                }}
+                disabled={isApplyingEdits}
+                className="px-4 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-50"
+              >
+                Continue without changes
+              </button>
+              <button
+                onClick={async () => {
+                  if (activeEdits.length > 0) {
+                    await handleApplyEdits(activeEdits, true);
+                  } else {
+                    setIsEditingText(false);
+                  }
+                }}
+                disabled={isApplyingEdits}
+                className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+              >
+                {isApplyingEdits ? (
+                  <>
+                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                    <span>Applying...</span>
+                  </>
+                ) : (
+                  <span>Continue</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,8 +6,11 @@ from PIL import Image
 import io
 import base64
 import os
-from typing import Optional
+from typing import Optional, List
 import logging
+from pydantic import BaseModel
+from ocr_processor import detect_text_regions, apply_text_edits
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -118,6 +121,9 @@ async def extract_pdf_image(file: UploadFile = File(...)):
             new_height = int(pil_image.height * ratio)
             pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
         
+        # Run OCR detection on the final image
+        ocr_results = detect_text_regions(pil_image)
+        
         # Convert to JPEG with high quality
         img_buffer = io.BytesIO()
         pil_image.save(img_buffer, format="JPEG", quality=92, optimize=True)
@@ -139,7 +145,8 @@ async def extract_pdf_image(file: UploadFile = File(...)):
                 "width": pil_image.width,
                 "height": pil_image.height
             },
-            "dominant_color": dominant_color  # 🔥 Added here
+            "dominant_color": dominant_color,
+            "ocr_results": ocr_results
         })
         
     except HTTPException:
@@ -200,6 +207,9 @@ async def process_image(file: UploadFile = File(...)):
             new_height = int(pil_image.height * ratio)
             pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
         
+        # Run OCR detection on the final image
+        ocr_results = detect_text_regions(pil_image)
+        
         # Convert to JPEG with high quality
         img_buffer = io.BytesIO()
         pil_image.save(img_buffer, format="JPEG", quality=92, optimize=True)
@@ -220,7 +230,8 @@ async def process_image(file: UploadFile = File(...)):
                 "width": pil_image.width,
                 "height": pil_image.height
             },
-            "dominant_color": dominant_color  # ✅ Added here only
+            "dominant_color": dominant_color,
+            "ocr_results": ocr_results
         })
         
     except Exception as e:
@@ -230,6 +241,54 @@ async def process_image(file: UploadFile = File(...)):
             detail=f"Failed to process image: {str(e)}"
         )
 
+class TextEditItem(BaseModel):
+    id: str
+    box: List[List[int]]
+    action: str  # "remove" or "replace"
+    new_text: Optional[str] = ""
+    original_text: Optional[str] = ""
+    angle: Optional[float] = 0.0
+    color: Optional[List[int]] = [0, 0, 0]
+    width: Optional[int] = 0
+    height: Optional[int] = 0
+
+class ImageEditRequest(BaseModel):
+    image_data: str  # base64 string
+    edits: List[TextEditItem]
+
+@app.post("/edit-image-text")
+async def edit_image_text(request: ImageEditRequest):
+    try:
+        # Decode base64 image
+        if ',' in request.image_data:
+            header, encoded = request.image_data.split(",", 1)
+        else:
+            encoded = request.image_data
+            
+        image_bytes = base64.b64decode(encoded)
+        pil_image = Image.open(io.BytesIO(image_bytes))
+        
+        # Apply the edits
+        processed_pil = apply_text_edits(pil_image, [edit.model_dump() for edit in request.edits])
+        
+        # Save to buffer as JPEG
+        img_buffer = io.BytesIO()
+        processed_pil.save(img_buffer, format="JPEG", quality=92, optimize=True)
+        img_buffer.seek(0)
+        
+        # Encode to base64
+        img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+        data_url = f"data:image/jpeg;base64,{img_base64}"
+        
+        return JSONResponse({
+            "success": True,
+            "message": "Image text edited successfully",
+            "image_data": data_url
+        })
+    except Exception as e:
+        logger.error(f"Error in edit_image_text endpoint: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to edit image text: {str(e)}")
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
