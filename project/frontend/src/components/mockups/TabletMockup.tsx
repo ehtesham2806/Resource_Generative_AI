@@ -9,6 +9,7 @@ interface TabletMockupProps {
   coverLeft?: string;
   coverScale?: number;
   frameVerticalOffset?: number;
+  frameScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -25,6 +26,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
     coverLeft = '0px',
     coverScale = 1,
     frameVerticalOffset = 0,
+    frameScale = 1,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -50,7 +52,13 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
         {/* Tablet Device container */}
         <div 
           className="relative h-[88%] aspect-[1/1.38] rounded-[12px] border-[6px] border-[#181826] bg-[#0c0c1b] shadow-[0_25px_65px_-15px_rgba(0,0,0,0.85),_0_0_50px_rgba(6,182,212,0.06)] flex flex-col overflow-hidden"
-          style={{ boxSizing: 'border-box', position: 'relative', top: `${frameVerticalOffset}px` }}
+          style={{ 
+            boxSizing: 'border-box', 
+            position: 'relative', 
+            top: `${frameVerticalOffset}px`,
+            transform: `scale(${frameScale})`,
+            transformOrigin: 'center center'
+          }}
         >
           {/* Top Camera Dot */}
           <div className="absolute top-[6px] left-1/2 -translate-x-1/2 w-[8px] h-[8px] rounded-full bg-[#08080f] z-30 flex items-center justify-center shadow-inner">

@@ -9,6 +9,7 @@ interface GuideMockupProps {
   coverPosition?: string;
   coverLeft?: string;
   coverScale?: number;
+  frameScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -38,6 +39,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
+    frameScale = 1,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -158,10 +160,14 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                       width: '80%',
                       height: '50%',
                       backgroundColor: dominantColor || '#1a1a2e',
+                      transform: `scale(${coverScale})`,
+                      transformOrigin: 'center center'
                     }
                   : {
                       width: '45%',
                       backgroundColor: dominantColor || '#1a1a2e',
+                      transform: `scale(${coverScale})`,
+                      transformOrigin: 'center center'
                     }
               }
             >
@@ -184,14 +190,14 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                         ? {
                             top: '50%',
                             left: '50%',
-                            transform: `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`,
+                            transform: `translate(-50%, -50%) translate(${coverLeft}, ${coverPosition})`,
                           }
                         : {
                             top: '50%',
                             left: '50%',
                             transform: 'translate(-50%, -50%)',
-                            width: `${100 * coverScale}%`,
-                            height: `${100 * coverScale}%`,
+                            width: '100%',
+                            height: '100%',
                             objectPosition: `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`,
                           }
                     }

@@ -9,6 +9,7 @@ interface LaptopMockupProps {
   coverLeft?: string;
   coverScale?: number;
   frameVerticalOffset?: number;
+  frameScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -25,6 +26,7 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
     coverLeft = '0px',
     coverScale = 1,
     frameVerticalOffset = 0,
+    frameScale = 1,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -43,7 +45,15 @@ const LaptopMockup = forwardRef<HTMLDivElement, LaptopMockupProps>(
           backgroundRepeat: 'no-repeat',
         }}
       >
-        <div className="relative w-full max-w-[500px] p-4 flex items-center justify-center" style={{ position: 'relative', top: `${frameVerticalOffset}px` }}>
+        <div 
+          className="relative w-full max-w-[500px] p-4 flex items-center justify-center" 
+          style={{ 
+            position: 'relative', 
+            top: `${frameVerticalOffset}px`,
+            transform: `scale(${frameScale})`,
+            transformOrigin: 'center center'
+          }}
+        >
           <div className="relative w-full">
             {/* Laptop base image */}
             <img

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
   Monitor,
-  Sparkles,
   RotateCcw,
   AlertCircle,
   CheckCircle,
@@ -79,6 +78,7 @@ function App() {
   const [coverLeft, setCoverLeft] = useState<string>('0px');
   const [coverScale, setCoverScale] = useState<number>(1.0);
   const [frameVerticalOffset, setFrameVerticalOffset] = useState<number>(0);
+  const [frameScale, setFrameScale] = useState<number>(1.0);
   const [outputWidth, setOutputWidth] = useState<number>(1200);
   const [outputHeight, setOutputHeight] = useState<number>(800);
   const [backgroundColor, setBackgroundColor] = useState<string>('#0b0b18');
@@ -211,6 +211,15 @@ function App() {
     setWebinarBadgeTextColor('#d946ef');
     setWebinarBadgeDotColor('#d946ef');
     setWebinarShowDescription(true);
+    setFrameVerticalOffset(0);
+    setFrameScale(1.0);
+    setGuideHeading("The Complete Beginner's Guide to Better Design");
+    setGuideDescription("Learn the fundamentals of visual hierarchy, typography, and layout to create stunning designs.");
+    setGuideHeadingColor('#1e293b');
+    setGuideHeadingSize(36);
+    setGuideDescriptionColor('#64748b');
+    setGuideDescriptionSize(14);
+    setGuideShowDescription(true);
   };
 
   const handleBrandChange = (brandKey: string) => {
@@ -1218,6 +1227,7 @@ function App() {
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
                     frameVerticalOffset={frameVerticalOffset}
+                    frameScale={frameScale}
                   />
                 ) : mockupTemplate === 'book' ? (
                   <BookMockup
@@ -1234,6 +1244,7 @@ function App() {
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
                     frameVerticalOffset={frameVerticalOffset}
+                    frameScale={frameScale}
                   />
                 ) : mockupTemplate === 'phone' ? (
                   <PhoneMockup
@@ -1250,6 +1261,7 @@ function App() {
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
                     frameVerticalOffset={frameVerticalOffset}
+                    frameScale={frameScale}
                   />
                 ) : mockupTemplate === 'tablet' ? (
                   <TabletMockup
@@ -1266,6 +1278,7 @@ function App() {
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
                     frameVerticalOffset={frameVerticalOffset}
+                    frameScale={frameScale}
                   />
                 ) : mockupTemplate === 'webinar' ? (
                   <WebinarMockup
@@ -1277,6 +1290,7 @@ function App() {
                     coverPosition={coverPosition}
                     coverLeft={coverLeft}
                     coverScale={coverScale}
+                    frameScale={frameScale}
                     backgroundColor={backgroundColor}
                     backgroundImage={backgroundImage}
                     outputWidth={outputWidth}
@@ -1318,6 +1332,7 @@ function App() {
                     coverPosition={coverPosition}
                     coverLeft={coverLeft}
                     coverScale={coverScale}
+                    frameScale={frameScale}
                     backgroundColor={backgroundColor}
                     backgroundImage={backgroundImage}
                     outputWidth={outputWidth}
@@ -1601,8 +1616,7 @@ function App() {
                 ))}
               </div>
             </div>
-
-            {/* 2. Transform Sliders card */}
+            {/* 2. Transform Sliders card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-5">
               <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
                 <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-brand" />
@@ -1614,9 +1628,31 @@ function App() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
-                    <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
-                      {coverPosition}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                        <input
+                          type="number"
+                          value={parseInt(coverPosition) || 0}
+                          min="-300"
+                          max="300"
+                          onChange={(e) => {
+                            let val = parseInt(e.target.value);
+                            if (isNaN(val)) val = 0;
+                            val = Math.max(-300, Math.min(300, val));
+                            setCoverPosition(`${val}px`);
+                          }}
+                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
+                      </div>
+                      <button
+                        onClick={() => setCoverPosition('0px')}
+                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                        title="Reset to 0px"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -1632,9 +1668,31 @@ function App() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
-                    <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
-                      {coverLeft}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                        <input
+                          type="number"
+                          value={parseInt(coverLeft) || 0}
+                          min="-300"
+                          max="300"
+                          onChange={(e) => {
+                            let val = parseInt(e.target.value);
+                            if (isNaN(val)) val = 0;
+                            val = Math.max(-300, Math.min(300, val));
+                            setCoverLeft(`${val}px`);
+                          }}
+                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
+                      </div>
+                      <button
+                        onClick={() => setCoverLeft('0px')}
+                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                        title="Reset to 0px"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -1650,9 +1708,32 @@ function App() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
-                    <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
-                      {coverScale.toFixed(2)}x
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={parseFloat(coverScale.toFixed(2))}
+                          min="0.5"
+                          max="3.0"
+                          onChange={(e) => {
+                            let val = parseFloat(e.target.value);
+                            if (isNaN(val)) val = 1.0;
+                            val = Math.max(0.5, Math.min(3.0, val));
+                            setCoverScale(val);
+                          }}
+                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">x</span>
+                      </div>
+                      <button
+                        onClick={() => setCoverScale(1.0)}
+                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                        title="Reset to 1.00x"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                   <input
                     type="range"
@@ -1673,9 +1754,31 @@ function App() {
                         <MoveVertical className="w-3 h-3 mr-1 text-brand" />
                         Frame Position
                       </span>
-                      <span className="bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] text-indigo-600 dark:text-indigo-300 font-bold px-2 py-0.5 rounded-full text-[10px] transition-colors duration-300">
-                        {frameVerticalOffset}px
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                          <input
+                            type="number"
+                            value={frameVerticalOffset}
+                            min="-200"
+                            max="200"
+                            onChange={(e) => {
+                              let val = parseInt(e.target.value);
+                              if (isNaN(val)) val = 0;
+                              val = Math.max(-200, Math.min(200, val));
+                              setFrameVerticalOffset(val);
+                            }}
+                            className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
+                        </div>
+                        <button
+                          onClick={() => setFrameVerticalOffset(0)}
+                          className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                          title="Reset to 0px"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                     <input
                       type="range"
@@ -1683,6 +1786,53 @@ function App() {
                       max="200"
                       value={frameVerticalOffset}
                       onChange={(e) => setFrameVerticalOffset(parseInt(e.target.value))}
+                      className="slider-gradient-track mt-1"
+                    />
+                  </div>
+                )}
+
+                {/* Frame Scale slider - for all mockups except default */}
+                {mockupTemplate !== 'default' && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider flex items-center">
+                        <Maximize2 className="w-3 h-3 mr-1 text-brand" />
+                        Frame Scale
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                          <input
+                            type="number"
+                            step="0.05"
+                            value={parseFloat(frameScale.toFixed(2))}
+                            min="0.5"
+                            max="2.0"
+                            onChange={(e) => {
+                              let val = parseFloat(e.target.value);
+                              if (isNaN(val)) val = 1.0;
+                              val = Math.max(0.5, Math.min(2.0, val));
+                              setFrameScale(val);
+                            }}
+                            className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">x</span>
+                        </div>
+                        <button
+                          onClick={() => setFrameScale(1.0)}
+                          className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                          title="Reset to 1.00x"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="2.0"
+                      step="0.05"
+                      value={frameScale}
+                      onChange={(e) => setFrameScale(parseFloat(e.target.value))}
                       className="slider-gradient-track mt-1"
                     />
                   </div>

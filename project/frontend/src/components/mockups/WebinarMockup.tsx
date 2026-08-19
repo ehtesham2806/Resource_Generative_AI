@@ -9,6 +9,7 @@ interface WebinarMockupProps {
   coverPosition?: string;
   coverLeft?: string;
   coverScale?: number;
+  frameScale?: number;
   backgroundColor?: string;
   backgroundImage?: string;
   outputWidth: number;
@@ -50,6 +51,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
     coverPosition = '0px',
     coverLeft = '0px',
     coverScale = 1,
+    frameScale = 1,
     backgroundColor,
     backgroundImage,
     outputWidth,
@@ -314,11 +316,13 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
             {/* Right Side: PDF first page / Image Screen container (dynamic sizing based on aspect ratio orientation) */}
             <div 
               className="shrink-0 aspect-[3/4] rounded-2xl overflow-hidden border border-white/20 dark:border-white/10 shadow-[0_15px_35px_rgba(0,0,0,0.4)] relative bg-slate-900/40 flex items-center justify-center group"
-              style={
-                isPortrait
+              style={{
+                ...(isPortrait
                   ? { width: '56%', height: 'auto', backgroundColor: dominantColor || undefined }
-                  : { height: '82%', width: 'auto', backgroundColor: dominantColor || undefined }
-              }
+                  : { height: '82%', width: 'auto', backgroundColor: dominantColor || undefined }),
+                transform: `scale(${frameScale})`,
+                transformOrigin: 'center center'
+              }}
             >
               {isLoading ? (
                 <div className="w-full h-full flex items-center justify-center bg-black/50">
