@@ -6,11 +6,23 @@ from PIL import Image
 import io
 import base64
 import os
+from pathlib import Path
 from typing import Optional, List
 import logging
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from ocr_processor import detect_text_regions, apply_text_edits
 
+# Load .env from backend directory or parent project directory
+env_path_backend = Path(__file__).resolve().parent / ".env"
+env_path_project = Path(__file__).resolve().parent.parent / ".env"
+
+if env_path_backend.exists():
+    load_dotenv(dotenv_path=env_path_backend)
+elif env_path_project.exists():
+    load_dotenv(dotenv_path=env_path_project)
+else:
+    load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,9 +31,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="PDF Image Extractor API", version="1.0.0")
 
 # Configure CORS
+cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_origins=allowed_origins if allowed_origins else ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -31,6 +46,8 @@ app.add_middleware(
 def get_dominant_color(pil_image: Image.Image) -> str:
     small_image = pil_image.resize((50, 50))
     result = small_image.convert("RGB").getcolors(2500)
+    if not result:
+        return "#ffffff"
     dominant_color = max(result, key=lambda x: x[0])[1]
     return '#%02x%02x%02x' % dominant_color
 
@@ -175,7 +192,7 @@ async def process_image(file: UploadFile = File(...)):
     """
     try:
         # Validate file type
-        if not file.content_type.startswith("image/"):
+        if not file.content_type or not file.content_type.startswith("image/"):
             raise HTTPException(
                 status_code=400, 
                 detail="Invalid file type. Only image files are supported."

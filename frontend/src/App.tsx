@@ -34,6 +34,7 @@ import WebinarMockup from './components/mockups/WebinarMockup.tsx';
 import GuideMockup from './components/mockups/GuideMockup.tsx';
 import { FileUpload } from './components/FileUpload';
 import { checkBackendHealth } from './utils/fileProcessor';
+import { API_BASE_URL } from './config';
 import * as htmlToImage from 'html-to-image';
 import { DROPDOWN_OPTIONS } from './utils/brands';
 import { SearchableBrandDropdown } from './components/SearchableBrandDropdown';
@@ -171,7 +172,7 @@ function App() {
       const isPdf = file.type === 'application/pdf';
       const endpoint = isPdf ? 'extract-pdf-image' : 'process-image';
 
-      const res = await fetch(`http://localhost:8000/${endpoint}`, {
+      const res = await fetch(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
         body: formData,
       });
@@ -205,7 +206,7 @@ function App() {
     if (!originalImageUrl) return;
     setIsApplyingEdits(true);
     try {
-      const response = await fetch('http://localhost:8000/edit-image-text', {
+      const response = await fetch(`${API_BASE_URL}/edit-image-text`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -335,6 +336,15 @@ function App() {
     }
   };
 
+  const getDownloadFileName = (defaultPrefix: string) => {
+    if (fileName) {
+      const baseName = fileName.replace(/\.[^/.]+$/, '');
+      const scaleSuffix = exportScale > 1 ? `@${exportScale}x` : '';
+      return `${baseName}${scaleSuffix}.png`;
+    }
+    return `${defaultPrefix}-${Date.now()}-${exportScale}x.png`;
+  };
+
   // ==============================
   // DEFAULT MOCKUP (html-to-image)
   // ==============================
@@ -396,7 +406,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `default-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('default-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -471,7 +481,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `laptop-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('laptop-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -549,7 +559,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `book-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('book-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -624,7 +634,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `phone-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('phone-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -699,7 +709,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `tablet-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('tablet-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -774,7 +784,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `webinar-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('webinar-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);
@@ -846,7 +856,7 @@ function App() {
       }
 
       const link = document.createElement('a');
-      link.download = `guide-mockup-${Date.now()}-${exportScale}x.png`;
+      link.download = getDownloadFileName('guide-mockup');
       link.href = finalCanvas.toDataURL('image/png');
 
       document.body.appendChild(link);

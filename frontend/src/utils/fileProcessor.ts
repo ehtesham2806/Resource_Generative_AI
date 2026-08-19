@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:8000';
+import { API_BASE_URL } from '../config';
 
 export const processFile = async (file: File): Promise<string> => {
   try {
@@ -45,7 +45,7 @@ export const processFile = async (file: File): Promise<string> => {
     console.error('File processing error:', error);
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new Error('Cannot connect to the backend server. Please make sure the Python server is running on http://localhost:8000');
+      throw new Error(`Cannot connect to the backend server. Please make sure the Python server is running on ${API_BASE_URL}`);
     }
     
     throw error;

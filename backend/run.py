@@ -6,10 +6,10 @@ import uvicorn
 from main import app
 
 if __name__ == "__main__":
-    print("🚀 Starting PDF Image Extractor API...")
-    print("📍 Server will be available at: http://localhost:8000")
-    print("📖 API documentation at: http://localhost:8000/docs")
-    print("🔄 Auto-reload enabled for development")
+    print("[*] Starting PDF Image Extractor API...")
+    print("[*] Server will be available at: http://localhost:8000")
+    print("[*] API documentation at: http://localhost:8000/docs")
+    print("[*] Auto-reload enabled for development")
     
     uvicorn.run(
         "main:app",
