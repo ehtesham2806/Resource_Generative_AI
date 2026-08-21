@@ -19,6 +19,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   server: {
+    port: 5174,
     headers: {
       'Cross-Origin-Embedder-Policy': 'credentialless',
       'Cross-Origin-Opener-Policy': 'same-origin'

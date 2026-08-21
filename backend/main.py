@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="PDF Image Extractor API", version="1.0.0")
 
 # Configure CORS
-cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5174,http://127.0.0.1:5174")
 allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
 
 app.add_middleware(
@@ -308,4 +308,6 @@ async def edit_image_text(request: ImageEditRequest):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", 8001))
+    uvicorn.run(app, host=host, port=port, reload=True)

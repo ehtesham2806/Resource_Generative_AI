@@ -32,9 +32,9 @@ pip install -r requirements.txt
 python run.py
 ```
 
-The backend will be available at `http://localhost:8000`
-- API Documentation: `http://localhost:8000/docs`
-- Health Check: `http://localhost:8000/health`
+The backend will be available at `http://localhost:8001`
+- API Documentation: `http://localhost:8001/docs`
+- Health Check: `http://localhost:8001/health`
 
 ### 2. Start the React Frontend
 
@@ -48,7 +48,7 @@ npm install
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:5173`
+The frontend will be available at `http://localhost:5174`
 
 ## API Endpoints
 
@@ -63,13 +63,13 @@ The frontend will be available at `http://localhost:5173`
 
 ```bash
 # Health check
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Extract PDF first page
-curl -X POST -F "file=@document.pdf" http://localhost:8000/extract-pdf-image
+curl -X POST -F "file=@document.pdf" http://localhost:8001/extract-pdf-image
 
 # Process image
-curl -X POST -F "file=@image.jpg" http://localhost:8000/process-image
+curl -X POST -F "file=@image.jpg" http://localhost:8001/process-image
 ```
 
 ## Project Structure
@@ -126,7 +126,7 @@ npm run dev  # Hot reload enabled
 ```bash
 cd backend
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8001
 ```
 
 #### Frontend
@@ -161,16 +161,17 @@ npm run preview
 ### Backend Issues
 - Ensure Python 3.8+ is installed
 - Check if all dependencies are installed: `pip install -r requirements.txt`
-- Verify the server is running on port 8000
+- Verify the server is running on port 8001
 
 ### Frontend Issues
 - Ensure Node.js 16+ is installed
-- Check if backend is accessible: visit `http://localhost:8000/health`
+- Check if backend is accessible: visit `http://localhost:8001/health`
 - Clear browser cache if experiencing issues
 
 ### CORS Issues
-- Backend is configured to allow requests from `localhost:5173`
+- Backend is configured to allow requests from `localhost:5174`
 - If using different ports, update CORS settings in `backend/main.py`
+
 
 ## License
 

@@ -922,8 +922,10 @@ function App() {
             <div className="flex items-center">
               {backendStatus === 'online' ? (
                 <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-green-500/10 text-green-400 border border-green-500/20 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-ping"></span>
-                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 absolute"></span>
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
                   <span>Backend online</span>
                 </div>
               ) : backendStatus === 'checking' ? (
@@ -933,7 +935,7 @@ function App() {
                 </div>
               ) : (
                 <div className="inline-flex items-center space-x-1.5 px-3 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
                   <span>Backend offline</span>
                 </div>
               )}
@@ -1497,7 +1499,7 @@ function App() {
                     ) : (
                       <>
                         <Download className="w-3.5 h-3.5" />
-                        <span>Download Mockup ({exportScale}x)</span>
+                        <span>Export ({exportScale}x)</span>
                       </>
                     )}
                   </button>
@@ -1702,7 +1704,8 @@ function App() {
                 ))}
               </div>
             </div>
-            {/* 2. Transform Sliders card */}
+
+            {/* 2. Transform Sliders card */}
             <div className="premium-card rounded-2xl p-5 flex flex-col gap-5">
               <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
                 <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-brand" />
