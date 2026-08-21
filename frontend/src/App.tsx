@@ -26,6 +26,9 @@ import {
   MoveVertical,
   Sparkles,
   RefreshCw,
+  Pencil,
+  Trash2,
+  X,
 } from 'lucide-react';
 import LaptopMockup from './components/mockups/LaptopMockup.tsx';
 import BookMockup from './components/mockups/BookMockup.tsx';
@@ -66,6 +69,7 @@ function App() {
   const [ocrStatus, setOcrStatus] = useState<'idle' | 'scanning' | 'ready' | 'error'>('idle');
   const ocrAbortControllerRef = useRef<AbortController | null>(null);
   const [activeEdits, setActiveEdits] = useState<any[]>([]);
+  const [appliedEdits, setAppliedEdits] = useState<any[]>([]);
   const [isEditingText, setIsEditingText] = useState<boolean>(false);
   const [isApplyingEdits, setIsApplyingEdits] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -195,6 +199,11 @@ function App() {
     }
   };
 
+  const openTextEditor = () => {
+    setActiveEdits(appliedEdits);
+    setIsEditingText(true);
+  };
+
   const handleFileSelect = async (file: File) => {
     if (ocrAbortControllerRef.current) {
       ocrAbortControllerRef.current.abort();
@@ -208,6 +217,7 @@ function App() {
     setOcrResults([]);
     setOcrStatus('idle');
     setActiveEdits([]);
+    setAppliedEdits([]);
     setIsEditingText(false);
 
     try {
@@ -266,6 +276,7 @@ function App() {
       const data = await response.json();
       if (data.success) {
         setImageUrl(data.image_data);
+        setAppliedEdits(editsToApply);
         if (autoContinue) {
           setIsEditingText(false);
         }
@@ -289,6 +300,7 @@ function App() {
     setOcrResults([]);
     setOcrStatus('idle');
     setActiveEdits([]);
+    setAppliedEdits([]);
     setIsEditingText(false);
     setIsApplyingEdits(false);
     setEditingId(null);
@@ -1011,30 +1023,6 @@ function App() {
               )}
             </button>
 
-            {imageUrl && (
-              <button
-                onClick={() => setIsEditingText(true)}
-                className="flex items-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-[#151532] dark:hover:bg-[#1e1e48] border border-indigo-150 dark:border-[#2b2b54] text-brand dark:text-indigo-300 font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99]"
-                title="Edit or Remove Image Text Content via OCR"
-              >
-                {ocrStatus === 'scanning' ? (
-                  <>
-                    <span className="relative flex h-2 w-2 mr-0.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
-                    </span>
-                    <span>Edit Image Text</span>
-                    <span className="text-[10px] text-brand/80 dark:text-indigo-400 font-medium ml-1 animate-pulse">Scanning...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-3.5 h-3.5" />
-                    <span>Edit Image Text</span>
-                  </>
-                )}
-              </button>
-            )}
-
             <div className="flex items-stretch relative" ref={headerScaleDropdownRef}>
               <button
                 onClick={handleDownload}
@@ -1217,7 +1205,7 @@ function App() {
                   </div>
                   <div className="flex items-center space-x-1.5 flex-shrink-0">
                     <button
-                      onClick={() => setIsEditingText(true)}
+                      onClick={openTextEditor}
                       className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group relative"
                       title={ocrStatus === 'scanning' ? "AI Text Scan in progress... Click to view" : "Edit Detected Text"}
                     >
@@ -1336,17 +1324,40 @@ function App() {
             <div className="relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
               
               {/* Top Canvas Badges */}
-              <div className="absolute top-5 left-6 z-10 flex items-center">
+              <div className="absolute top-5 left-6 z-10 flex items-center space-x-2">
                 <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-colors duration-300">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>{outputWidth} × {outputHeight}</span>
                 </div>
-              </div>
-
-              <div className="absolute top-5 right-6 z-10">
                 <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full transition-colors duration-300">
                   100%
                 </div>
+              </div>
+
+              <div className="absolute top-5 right-6 z-10 flex items-center">
+                {imageUrl && (
+                  <button
+                    onClick={openTextEditor}
+                    className="bg-white/80 dark:bg-[#080814]/80 hover:bg-indigo-50 dark:hover:bg-[#151532] backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] hover:border-indigo-300 dark:hover:border-[#2b2b54] text-brand dark:text-indigo-300 font-semibold text-[11px] px-3.5 py-1.5 rounded-full shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5"
+                    title="Edit or Remove Image Text Content via OCR"
+                  >
+                    {ocrStatus === 'scanning' ? (
+                      <>
+                        <span className="relative flex h-2 w-2 mr-0.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
+                        </span>
+                        <span>Edit Image Text</span>
+                        <span className="text-[10px] text-brand/80 dark:text-indigo-400 font-medium ml-0.5 animate-pulse">Scanning...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5" />
+                        <span>Edit Image Text</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Centered device container */}
@@ -2060,13 +2071,13 @@ function App() {
               </div>
               <button 
                 onClick={() => {
-                  setImageUrl(originalImageUrl);
-                  setActiveEdits([]);
+                  setActiveEdits(appliedEdits);
                   setIsEditingText(false);
                 }}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 text-xs font-semibold p-1.5 hover:bg-slate-100 dark:hover:bg-[#181836] rounded-xl transition-all"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-[#181836] rounded-xl transition-all"
+                title="Close"
               >
-                Skip OCR
+                <X className="w-4 h-4" />
               </button>
             </div>
             
@@ -2292,16 +2303,17 @@ function App() {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center space-x-1 flex-shrink-0">
+                          <div className="flex items-center space-x-1.5 flex-shrink-0">
                             <button
                               onClick={() => {
                                 setEditingId(item.id);
                                 setEditingTextVal(isEdited ? edit.new_text : item.text);
                               }}
                               disabled={isRemoved}
-                              className="px-2 py-1 text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-[#181836] dark:hover:bg-[#202048] text-brand rounded-lg border border-indigo-100 dark:border-[#2b2b54] disabled:opacity-40 disabled:pointer-events-none transition-colors"
+                              title="Edit text"
+                              className="p-1 text-slate-400 hover:text-brand dark:hover:text-indigo-400 disabled:opacity-30 disabled:pointer-events-none transition-all hover:scale-110 active:scale-95"
                             >
-                              Edit
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => {
@@ -2319,13 +2331,14 @@ function App() {
                                   setActiveEdits(updatedEdits);
                                 }
                               }}
-                              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+                              title={isRemoved ? "Undo removal" : "Remove text"}
+                              className={`p-1 transition-all hover:scale-110 active:scale-95 ${
                                 isRemoved 
-                                  ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/30 text-amber-500 border-amber-200/50 dark:border-amber-900/50' 
-                                  : 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30 text-red-500 border-red-200/50 dark:border-red-900/50'
+                                  ? 'text-amber-500 hover:text-amber-600 dark:hover:text-amber-400' 
+                                  : 'text-slate-400 hover:text-red-500 dark:hover:text-red-400'
                               }`}
                             >
-                              {isRemoved ? 'Undo' : 'Remove'}
+                              {isRemoved ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
                             </button>
                           </div>
                         </div>
@@ -2348,7 +2361,7 @@ function App() {
                           }));
                           setActiveEdits(allRemoves);
                         }}
-                        className="flex-1 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                        className="flex-1 py-1.5 text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 hover:border-red-500/60 rounded-xl transition-all shadow-sm active:scale-[0.99]"
                       >
                         Remove All Text
                       </button>
@@ -2356,9 +2369,10 @@ function App() {
                       <button
                         onClick={() => {
                           setActiveEdits([]);
+                          setAppliedEdits([]);
                           setImageUrl(originalImageUrl);
                         }}
-                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-lg transition-colors"
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-xl transition-colors"
                       >
                         Reset
                       </button>
@@ -2372,8 +2386,7 @@ function App() {
             <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3.5 flex items-center justify-end space-x-3">
               <button
                 onClick={() => {
-                  setImageUrl(originalImageUrl);
-                  setActiveEdits([]);
+                  setActiveEdits(appliedEdits);
                   setIsEditingText(false);
                 }}
                 disabled={isApplyingEdits}
@@ -2386,6 +2399,8 @@ function App() {
                   if (activeEdits.length > 0) {
                     await handleApplyEdits(activeEdits, true);
                   } else {
+                    setAppliedEdits([]);
+                    setImageUrl(originalImageUrl);
                     setIsEditingText(false);
                   }
                 }}
@@ -2398,7 +2413,7 @@ function App() {
                     <span>Applying...</span>
                   </>
                 ) : (
-                  <span>Continue</span>
+                  <span>Apply</span>
                 )}
               </button>
             </div>
