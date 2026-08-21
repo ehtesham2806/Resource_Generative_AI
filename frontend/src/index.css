@@ -136,3 +136,24 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   display: none !important;
 }
 
+/* OCR Laser Scanner Animation */
+@keyframes ocr-laser {
+  0% {
+    top: 0%;
+    opacity: 0.9;
+  }
+  50% {
+    top: 96%;
+    opacity: 1;
+  }
+  100% {
+    top: 0%;
+    opacity: 0.9;
+  }
+}
+
+.animate-ocr-laser {
+  animation: ocr-laser 2.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+

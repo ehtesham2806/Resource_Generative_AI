@@ -138,9 +138,6 @@ async def extract_pdf_image(file: UploadFile = File(...)):
             new_height = int(pil_image.height * ratio)
             pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
         
-        # Run OCR detection on the final image
-        ocr_results = detect_text_regions(pil_image)
-        
         # Convert to JPEG with high quality
         img_buffer = io.BytesIO()
         pil_image.save(img_buffer, format="JPEG", quality=92, optimize=True)
@@ -162,8 +159,7 @@ async def extract_pdf_image(file: UploadFile = File(...)):
                 "width": pil_image.width,
                 "height": pil_image.height
             },
-            "dominant_color": dominant_color,
-            "ocr_results": ocr_results
+            "dominant_color": dominant_color
         })
         
     except HTTPException:
@@ -224,9 +220,6 @@ async def process_image(file: UploadFile = File(...)):
             new_height = int(pil_image.height * ratio)
             pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
         
-        # Run OCR detection on the final image
-        ocr_results = detect_text_regions(pil_image)
-        
         # Convert to JPEG with high quality
         img_buffer = io.BytesIO()
         pil_image.save(img_buffer, format="JPEG", quality=92, optimize=True)
@@ -247,8 +240,7 @@ async def process_image(file: UploadFile = File(...)):
                 "width": pil_image.width,
                 "height": pil_image.height
             },
-            "dominant_color": dominant_color,
-            "ocr_results": ocr_results
+            "dominant_color": dominant_color
         })
         
     except Exception as e:
@@ -257,6 +249,35 @@ async def process_image(file: UploadFile = File(...)):
             status_code=500, 
             detail=f"Failed to process image: {str(e)}"
         )
+
+class OCRDetectRequest(BaseModel):
+    image_data: str  # base64 data url or string
+
+@app.post("/detect-ocr")
+async def detect_ocr(request: OCRDetectRequest):
+    """
+    Detect text regions asynchronously via OCR
+    """
+    try:
+        if ',' in request.image_data:
+            _, encoded = request.image_data.split(",", 1)
+        else:
+            encoded = request.image_data
+            
+        image_bytes = base64.b64decode(encoded)
+        pil_image = Image.open(io.BytesIO(image_bytes))
+        
+        # Run OCR detection
+        ocr_results = detect_text_regions(pil_image)
+        
+        return JSONResponse({
+            "success": True,
+            "message": "OCR text detected successfully",
+            "ocr_results": ocr_results
+        })
+    except Exception as e:
+        logger.error(f"Error during OCR detection: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to detect text: {str(e)}")
 
 class TextEditItem(BaseModel):
     id: str

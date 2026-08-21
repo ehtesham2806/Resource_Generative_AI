@@ -24,6 +24,8 @@ import {
   Sun,
   Moon,
   MoveVertical,
+  Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import LaptopMockup from './components/mockups/LaptopMockup.tsx';
 import BookMockup from './components/mockups/BookMockup.tsx';
@@ -61,6 +63,8 @@ function App() {
   const [imageUrl, setImageUrl] = useState<string>('');
   const [originalImageUrl, setOriginalImageUrl] = useState<string>('');
   const [ocrResults, setOcrResults] = useState<any[]>([]);
+  const [ocrStatus, setOcrStatus] = useState<'idle' | 'scanning' | 'ready' | 'error'>('idle');
+  const ocrAbortControllerRef = useRef<AbortController | null>(null);
   const [activeEdits, setActiveEdits] = useState<any[]>([]);
   const [isEditingText, setIsEditingText] = useState<boolean>(false);
   const [isApplyingEdits, setIsApplyingEdits] = useState<boolean>(false);
@@ -155,13 +159,54 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const triggerOcrDetection = async (base64Img: string) => {
+    if (!base64Img) return;
+    if (ocrAbortControllerRef.current) {
+      ocrAbortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    ocrAbortControllerRef.current = controller;
+
+    setOcrStatus('scanning');
+    try {
+      const res = await fetch(`${API_BASE_URL}/detect-ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ image_data: base64Img }),
+        signal: controller.signal,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setOcrResults(data.ocr_results || []);
+        setOcrStatus('ready');
+      } else {
+        setOcrStatus('error');
+      }
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.log('OCR request cancelled');
+        return;
+      }
+      console.error('Error running OCR detection:', err);
+      setOcrStatus('error');
+    }
+  };
+
   const handleFileSelect = async (file: File) => {
+    if (ocrAbortControllerRef.current) {
+      ocrAbortControllerRef.current.abort();
+    }
+
     setIsLoading(true);
     setFileName(file.name);
     setError('');
     setDominantColor('');
     setOriginalImageUrl('');
     setOcrResults([]);
+    setOcrStatus('idle');
     setActiveEdits([]);
     setIsEditingText(false);
 
@@ -187,9 +232,11 @@ function App() {
           setImageWidth(data.image_size.width);
           setImageHeight(data.image_size.height);
         }
-        if (data.ocr_results && data.ocr_results.length > 0) {
-          setOcrResults(data.ocr_results);
-        }
+        // Immediately stop upload loading so image is displayed on the mockup canvas right away!
+        setIsLoading(false);
+
+        // Run OCR in background without blocking image preview
+        triggerOcrDetection(data.image_data);
       } else {
         throw new Error(data.detail || 'Unknown error');
       }
@@ -197,7 +244,6 @@ function App() {
       console.error('Error processing file:', error);
       setError(error instanceof Error ? error.message : 'Error processing file. Please try again.');
       setImageUrl('');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -235,9 +281,13 @@ function App() {
   };
 
   const handleReset = () => {
+    if (ocrAbortControllerRef.current) {
+      ocrAbortControllerRef.current.abort();
+    }
     setImageUrl('');
     setOriginalImageUrl('');
     setOcrResults([]);
+    setOcrStatus('idle');
     setActiveEdits([]);
     setIsEditingText(false);
     setIsApplyingEdits(false);
@@ -961,14 +1011,27 @@ function App() {
               )}
             </button>
 
-            {imageUrl && ocrResults.length > 0 && (
+            {imageUrl && (
               <button
                 onClick={() => setIsEditingText(true)}
                 className="flex items-center space-x-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-[#151532] dark:hover:bg-[#1e1e48] border border-indigo-150 dark:border-[#2b2b54] text-brand dark:text-indigo-300 font-bold text-xs px-3.5 py-2 rounded-xl transition-all shadow-sm hover:scale-[1.01] active:scale-[0.99]"
                 title="Edit or Remove Image Text Content via OCR"
               >
-                <Zap className="w-3.5 h-3.5" />
-                <span>Edit Image Text</span>
+                {ocrStatus === 'scanning' ? (
+                  <>
+                    <span className="relative flex h-2 w-2 mr-0.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
+                    </span>
+                    <span>Edit Image Text</span>
+                    <span className="text-[10px] text-brand/80 dark:text-indigo-400 font-medium ml-1 animate-pulse">Scanning...</span>
+                  </>
+                ) : (
+                  <>
+                    <Zap className="w-3.5 h-3.5" />
+                    <span>Edit Image Text</span>
+                  </>
+                )}
               </button>
             )}
 
@@ -1153,15 +1216,20 @@ function App() {
                     </span>
                   </div>
                   <div className="flex items-center space-x-1.5 flex-shrink-0">
-                    {ocrResults.length > 0 && (
-                      <button
-                        onClick={() => setIsEditingText(true)}
-                        className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group"
-                        title="Edit Detected Text"
-                      >
+                    <button
+                      onClick={() => setIsEditingText(true)}
+                      className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group relative"
+                      title={ocrStatus === 'scanning' ? "AI Text Scan in progress... Click to view" : "Edit Detected Text"}
+                    >
+                      {ocrStatus === 'scanning' ? (
+                        <div className="relative flex items-center justify-center w-3.5 h-3.5">
+                          <span className="animate-ping absolute inline-flex h-2.5 w-2.5 rounded-full bg-brand opacity-75"></span>
+                          <Zap className="w-3.5 h-3.5 text-brand" />
+                        </div>
+                      ) : (
                         <Zap className="w-3.5 h-3.5 text-brand group-hover:text-indigo-600 dark:group-hover:text-white transition-colors" />
-                      </button>
-                    )}
+                      )}
+                    </button>
                     <button
                       onClick={handleReset}
                       className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group"
@@ -1966,10 +2034,26 @@ function App() {
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#1a1a32]">
               <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-white font-['Outfit'] flex items-center">
-                  <Zap className="w-5 h-5 mr-2 text-brand" />
-                  OCR Text Editor Step
-                </h3>
+                <div className="flex items-center space-x-2.5">
+                  <h3 className="text-lg font-bold text-slate-800 dark:text-white font-['Outfit'] flex items-center">
+                    <Zap className="w-5 h-5 mr-2 text-brand" />
+                    OCR Text Editor Step
+                  </h3>
+                  {ocrStatus === 'scanning' && (
+                    <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 animate-pulse">
+                      <span className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+                      </span>
+                      <span>AI Scanning in Progress</span>
+                    </span>
+                  )}
+                  {ocrStatus === 'ready' && (
+                    <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                      <span>{ocrResults.length} text region{ocrResults.length === 1 ? '' : 's'} detected</span>
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Detect, remove or edit text from your source document page before generating mockup creatives.
                 </p>
@@ -1988,11 +2072,19 @@ function App() {
             
             {/* Modal Body: Split view */}
             <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-6">
-              {/* Left Side: Interactive Preview */}
+              {/* Left Side: Interactive Preview with Scanning Laser */}
               <div className="flex-1 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950/40 rounded-2xl p-4 border border-slate-200 dark:border-[#1c1c38] relative overflow-hidden">
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 w-full text-left flex items-center">
-                  <ImageIcon className="w-4 h-4 mr-1.5 text-brand" />
-                  Interactive Image Map
+                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 w-full text-left flex items-center justify-between">
+                  <span className="flex items-center">
+                    <ImageIcon className="w-4 h-4 mr-1.5 text-brand" />
+                    Interactive Image Map
+                  </span>
+                  {ocrStatus === 'scanning' && (
+                    <span className="text-[10px] text-brand font-medium flex items-center space-x-1">
+                      <Sparkles className="w-3 h-3 animate-spin" />
+                      <span>Scanning text layers...</span>
+                    </span>
+                  )}
                 </h4>
                 <div className="relative max-w-full max-h-[380px] flex items-center justify-center select-none" style={{ aspectRatio: `${imageWidth}/${imageHeight}` }}>
                   <img 
@@ -2000,8 +2092,28 @@ function App() {
                     alt="Original for OCR" 
                     className="max-w-full max-h-[330px] object-contain rounded-lg shadow-md"
                   />
+
+                  {/* AI Laser Scanning Effect Overlay */}
+                  {ocrStatus === 'scanning' && (
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-lg z-20 flex items-center justify-center">
+                      {/* Laser Beam moving up and down */}
+                      <div className="absolute left-0 right-0 h-24 bg-gradient-to-b from-transparent via-indigo-500/20 to-transparent animate-ocr-laser pointer-events-none">
+                        <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-400 via-indigo-400 to-transparent shadow-[0_0_12px_rgba(99,102,241,1),0_0_24px_rgba(6,182,212,0.8)]"></div>
+                      </div>
+                      
+                      {/* Cyberpunk grid background scan texture */}
+                      <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:16px_16px] opacity-25 pointer-events-none"></div>
+
+                      {/* Floating Badge in Center */}
+                      <div className="absolute bottom-3 bg-slate-900/90 dark:bg-[#090915]/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-indigo-500/30 flex items-center space-x-2 text-[11px] text-indigo-200 shadow-2xl pointer-events-none animate-pulse">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-400"></div>
+                        <span className="font-semibold">Detecting document text...</span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Bounding box overlays */}
-                  {ocrResults.map((item) => {
+                  {ocrStatus === 'ready' && ocrResults.map((item) => {
                     const xs = item.box.map((pt: any) => pt[0]);
                     const ys = item.box.map((pt: any) => pt[1]);
                     const minX = Math.min(...xs);
@@ -2047,153 +2159,212 @@ function App() {
                   })}
                 </div>
                 <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 text-center">
-                  Hover over bounding boxes to see original text. Click any box to edit or remove it.
+                  {ocrStatus === 'scanning' 
+                    ? 'AI is analyzing text regions in the background. Detected boxes will appear shortly.' 
+                    : 'Hover over bounding boxes to see original text. Click any box to edit or remove it.'}
                 </p>
               </div>
               
               {/* Right Side: Text lines list & edits */}
               <div className="w-full md:w-80 flex flex-col gap-4 min-h-0">
                 <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                  <span>Detected Text Regions ({ocrResults.length})</span>
+                  <span>Detected Text Regions {ocrStatus === 'ready' ? `(${ocrResults.length})` : ''}</span>
                 </h4>
-                <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 max-h-[350px]">
-                  {ocrResults.map((item) => {
-                    const edit = activeEdits.find(e => e.id === item.id);
-                    const isRemoved = edit?.action === 'remove';
-                    const isEdited = edit?.action === 'replace';
-                    
-                    if (editingId === item.id) {
+
+                {/* Scanning Skeleton State */}
+                {ocrStatus === 'scanning' && (
+                  <div className="flex-1 flex flex-col justify-center items-center gap-3.5 p-4 bg-slate-50/70 dark:bg-[#101026] rounded-2xl border border-dashed border-indigo-300/40 dark:border-[#24244d] text-center min-h-[260px]">
+                    <div className="relative flex items-center justify-center">
+                      <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                      <Zap className="w-5 h-5 text-brand absolute" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Analyzing Document Text</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[220px] leading-relaxed">
+                        AI OCR is reading text layers and coordinates in the background...
+                      </p>
+                    </div>
+                    {/* Shimmer skeleton lines */}
+                    <div className="w-full space-y-2 mt-2">
+                      <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-full"></div>
+                      <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-5/6 mx-auto"></div>
+                      <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-full"></div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {ocrStatus === 'error' && (
+                  <div className="flex-1 flex flex-col justify-center items-center gap-3 p-4 bg-red-50/50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-900/40 text-center min-h-[220px]">
+                    <AlertCircle className="w-8 h-8 text-red-400" />
+                    <p className="text-xs font-semibold text-red-600 dark:text-red-300">OCR Detection Failed</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      Could not detect text regions. You can retry the OCR scan.
+                    </p>
+                    <button
+                      onClick={() => triggerOcrDetection(originalImageUrl)}
+                      className="mt-2 inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>Retry Scan</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Empty State when no text detected */}
+                {ocrStatus === 'ready' && ocrResults.length === 0 && (
+                  <div className="flex-1 flex flex-col justify-center items-center gap-2.5 p-4 bg-slate-50 dark:bg-[#101026] rounded-2xl border border-slate-200 dark:border-[#1c1c38] text-center min-h-[220px]">
+                    <CheckCircle className="w-8 h-8 text-slate-400" />
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No Text Detected</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[200px]">
+                      No readable text was found in this document page.
+                    </p>
+                  </div>
+                )}
+
+                {/* Ready State with detected text list */}
+                {ocrStatus === 'ready' && ocrResults.length > 0 && (
+                  <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 max-h-[350px]">
+                    {ocrResults.map((item) => {
+                      const edit = activeEdits.find(e => e.id === item.id);
+                      const isRemoved = edit?.action === 'remove';
+                      const isEdited = edit?.action === 'replace';
+                      
+                      if (editingId === item.id) {
+                        return (
+                          <div key={item.id} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-indigo-50/50 dark:bg-[#1a1a36] border border-indigo-200 dark:border-indigo-850">
+                            <span className="text-[10px] text-slate-500 font-semibold uppercase">Edit Text content</span>
+                            <input 
+                              type="text" 
+                              value={editingTextVal} 
+                              onChange={(e) => setEditingTextVal(e.target.value)} 
+                              className="premium-input text-xs w-full py-1 px-2"
+                              autoFocus
+                            />
+                            <div className="flex items-center space-x-1.5 justify-end mt-1">
+                              <button 
+                                onClick={() => {
+                                  const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                  updatedEdits.push({
+                                    id: item.id,
+                                    box: item.box,
+                                    action: 'replace',
+                                    new_text: editingTextVal,
+                                    original_text: item.text,
+                                    angle: item.angle,
+                                    color: item.color,
+                                    width: item.width,
+                                    height: item.height
+                                  });
+                                  setActiveEdits(updatedEdits);
+                                  setEditingId(null);
+                                }}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                              >
+                                Save
+                              </button>
+                              <button 
+                                onClick={() => setEditingId(null)}
+                                className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+                      
                       return (
-                        <div key={item.id} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-indigo-50/50 dark:bg-[#1a1a36] border border-indigo-200 dark:border-indigo-850">
-                          <span className="text-[10px] text-slate-500 font-semibold uppercase">Edit Text content</span>
-                          <input 
-                            type="text" 
-                            value={editingTextVal} 
-                            onChange={(e) => setEditingTextVal(e.target.value)} 
-                            className="premium-input text-xs w-full py-1 px-2"
-                            autoFocus
-                          />
-                          <div className="flex items-center space-x-1.5 justify-end mt-1">
-                            <button 
+                        <div key={item.id} className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                          isRemoved 
+                            ? 'bg-red-500/10 border-red-500/20' 
+                            : isEdited 
+                            ? 'bg-emerald-500/10 border-emerald-500/20' 
+                            : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/50 dark:border-[#171732]'
+                        }`}>
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <span className={`text-xs font-medium text-slate-750 dark:text-slate-200 truncate ${isRemoved ? 'line-through opacity-50' : ''}`}>
+                              {isEdited ? edit.new_text : item.text}
+                            </span>
+                            {isEdited && (
+                              <span className="text-[9px] text-slate-400 line-through truncate">
+                                orig: {item.text}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-1 flex-shrink-0">
+                            <button
                               onClick={() => {
-                                const updatedEdits = activeEdits.filter(e => e.id !== item.id);
-                                updatedEdits.push({
-                                  id: item.id,
-                                  box: item.box,
-                                  action: 'replace',
-                                  new_text: editingTextVal,
-                                  original_text: item.text,
-                                  angle: item.angle,
-                                  color: item.color,
-                                  width: item.width,
-                                  height: item.height
-                                });
-                                setActiveEdits(updatedEdits);
-                                setEditingId(null);
+                                setEditingId(item.id);
+                                setEditingTextVal(isEdited ? edit.new_text : item.text);
                               }}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                              disabled={isRemoved}
+                              className="px-2 py-1 text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-[#181836] dark:hover:bg-[#202048] text-brand rounded-lg border border-indigo-100 dark:border-[#2b2b54] disabled:opacity-40 disabled:pointer-events-none transition-colors"
                             >
-                              Save
+                              Edit
                             </button>
-                            <button 
-                              onClick={() => setEditingId(null)}
-                              className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                            <button
+                              onClick={() => {
+                                const exists = activeEdits.find(e => e.id === item.id);
+                                if (exists && exists.action === 'remove') {
+                                  setActiveEdits(activeEdits.filter(e => e.id !== item.id));
+                                } else {
+                                  const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                  updatedEdits.push({
+                                    id: item.id,
+                                    box: item.box,
+                                    action: 'remove',
+                                    original_text: item.text
+                                  });
+                                  setActiveEdits(updatedEdits);
+                                }
+                              }}
+                              className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+                                isRemoved 
+                                  ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/30 text-amber-500 border-amber-200/50 dark:border-amber-900/50' 
+                                  : 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30 text-red-500 border-red-200/50 dark:border-red-900/50'
+                              }`}
                             >
-                              Cancel
+                              {isRemoved ? 'Undo' : 'Remove'}
                             </button>
                           </div>
                         </div>
                       );
-                    }
-                    
-                    return (
-                      <div key={item.id} className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
-                        isRemoved 
-                          ? 'bg-red-500/10 border-red-500/20' 
-                          : isEdited 
-                          ? 'bg-emerald-500/10 border-emerald-500/20' 
-                          : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/50 dark:border-[#171732]'
-                      }`}>
-                        <div className="flex flex-col min-w-0 pr-2">
-                          <span className={`text-xs font-medium text-slate-750 dark:text-slate-200 truncate ${isRemoved ? 'line-through opacity-50' : ''}`}>
-                            {isEdited ? edit.new_text : item.text}
-                          </span>
-                          {isEdited && (
-                            <span className="text-[9px] text-slate-400 line-through truncate">
-                              orig: {item.text}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center space-x-1 flex-shrink-0">
-                          <button
-                            onClick={() => {
-                              setEditingId(item.id);
-                              setEditingTextVal(isEdited ? edit.new_text : item.text);
-                            }}
-                            disabled={isRemoved}
-                            className="px-2 py-1 text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 dark:bg-[#181836] dark:hover:bg-[#202048] text-brand rounded-lg border border-indigo-100 dark:border-[#2b2b54] disabled:opacity-40 disabled:pointer-events-none transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              const exists = activeEdits.find(e => e.id === item.id);
-                              if (exists && exists.action === 'remove') {
-                                setActiveEdits(activeEdits.filter(e => e.id !== item.id));
-                              } else {
-                                const updatedEdits = activeEdits.filter(e => e.id !== item.id);
-                                updatedEdits.push({
-                                  id: item.id,
-                                  box: item.box,
-                                  action: 'remove',
-                                  original_text: item.text
-                                });
-                                setActiveEdits(updatedEdits);
-                              }
-                            }}
-                            className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
-                              isRemoved 
-                                ? 'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/20 dark:hover:bg-amber-950/30 text-amber-500 border-amber-200/50 dark:border-amber-900/50' 
-                                : 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30 text-red-500 border-red-200/50 dark:border-red-900/50'
-                            }`}
-                          >
-                            {isRemoved ? 'Undo' : 'Remove'}
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                    })}
+                  </div>
+                )}
                 
                 {/* Modal actions sidebar bottom */}
-                <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3 flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        const allRemoves = ocrResults.map(item => ({
-                          id: item.id,
-                          box: item.box,
-                          action: 'remove',
-                          original_text: item.text
-                        }));
-                        setActiveEdits(allRemoves);
-                      }}
-                      className="flex-1 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                    >
-                      Remove All Text
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setActiveEdits([]);
-                        setImageUrl(originalImageUrl);
-                      }}
-                      className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-lg transition-colors"
-                    >
-                      Reset
-                    </button>
+                {ocrStatus === 'ready' && ocrResults.length > 0 && (
+                  <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3 flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const allRemoves = ocrResults.map(item => ({
+                            id: item.id,
+                            box: item.box,
+                            action: 'remove',
+                            original_text: item.text
+                          }));
+                          setActiveEdits(allRemoves);
+                        }}
+                        className="flex-1 py-1.5 text-xs font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                      >
+                        Remove All Text
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          setActiveEdits([]);
+                          setImageUrl(originalImageUrl);
+                        }}
+                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-lg transition-colors"
+                      >
+                        Reset
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
             
@@ -2218,7 +2389,7 @@ function App() {
                     setIsEditingText(false);
                   }
                 }}
-                disabled={isApplyingEdits}
+                disabled={isApplyingEdits || ocrStatus === 'scanning'}
                 className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
               >
                 {isApplyingEdits ? (
