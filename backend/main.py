@@ -100,6 +100,58 @@ async def extract_pdf_image(file: UploadFile = File(...)):
             logger.error(f"Error accessing first page: {str(e)}")
             raise HTTPException(status_code=400, detail="Unable to access PDF first page")
         
+        # Extract native text blocks from the first page using PyMuPDF
+        page_width_pts = float(first_page.rect.width)
+        page_height_pts = float(first_page.rect.height)
+        text_dict = first_page.get_text("dict")
+        native_text_blocks = []
+        block_idx = 0
+        for block in text_dict.get("blocks", []):
+            if block.get("type") == 0:  # Text block
+                for line in block.get("lines", []):
+                    spans = line.get("spans", [])
+                    if not spans:
+                        continue
+                    full_text = "".join(span.get("text", "") for span in spans).strip()
+                    if not full_text:
+                        continue
+                    first_span = spans[0]
+                    bbox = line.get("bbox", first_span.get("bbox"))
+                    x0, y0, x1, y1 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+                    
+                    x0 = max(0.0, min(page_width_pts, x0))
+                    y0 = max(0.0, min(page_height_pts, y0))
+                    x1 = max(0.0, min(page_width_pts, x1))
+                    y1 = max(0.0, min(page_height_pts, y1))
+                    
+                    if x1 <= x0 or y1 <= y0:
+                        continue
+                        
+                    color_int = first_span.get("color", 0)
+                    r = (color_int >> 16) & 255
+                    g = (color_int >> 8) & 255
+                    b = color_int & 255
+                    
+                    native_text_blocks.append({
+                        "id": f"pdf_txt_{block_idx}",
+                        "text": full_text,
+                        "pdf_rect": [x0, y0, x1, y1],
+                        "font_size": float(first_span.get("size", 12.0)),
+                        "font_name": str(first_span.get("font", "Helvetica")),
+                        "flags": int(first_span.get("flags", 0)),
+                        "color": [r, g, b],
+                        "rel_box": {
+                            "left": (x0 / page_width_pts) * 100.0,
+                            "top": (y0 / page_height_pts) * 100.0,
+                            "width": ((x1 - x0) / page_width_pts) * 100.0,
+                            "height": ((y1 - y0) / page_height_pts) * 100.0
+                        }
+                    })
+                    block_idx += 1
+
+        has_native_text = len(native_text_blocks) > 0
+        pdf_base64 = base64.b64encode(pdf_content).decode()
+
         # Set high resolution for better quality (300 DPI)
         zoom = 300 / 72  # 72 is default DPI, 300 is target DPI
         matrix = fitz.Matrix(zoom, zoom)
@@ -147,7 +199,7 @@ async def extract_pdf_image(file: UploadFile = File(...)):
         img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
         data_url = f"data:image/jpeg;base64,{img_base64}"
         
-        logger.info(f"Successfully extracted first page from PDF: {file.filename}")
+        logger.info(f"Successfully extracted first page from PDF: {file.filename}, has_native_text: {has_native_text}, spans: {len(native_text_blocks)}")
         
         return JSONResponse({
             "success": True,
@@ -155,6 +207,14 @@ async def extract_pdf_image(file: UploadFile = File(...)):
             "image_data": data_url,
             "original_filename": file.filename,
             "page_count": page_count,
+            "is_pdf": True,
+            "has_native_text": has_native_text,
+            "native_text_blocks": native_text_blocks,
+            "pdf_data": pdf_base64,
+            "page_size": {
+                "width": page_width_pts,
+                "height": page_height_pts
+            },
             "image_size": {
                 "width": pil_image.width,
                 "height": pil_image.height
@@ -326,6 +386,153 @@ async def edit_image_text(request: ImageEditRequest):
     except Exception as e:
         logger.error(f"Error in edit_image_text endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to edit image text: {str(e)}")
+
+class PDFTextEditItem(BaseModel):
+    id: str
+    pdf_rect: List[float]  # [x0, y0, x1, y1] in PDF points
+    action: str  # "remove" or "replace"
+    new_text: Optional[str] = ""
+    original_text: Optional[str] = ""
+    font_size: Optional[float] = 12.0
+    font_name: Optional[str] = "helv"
+    color: Optional[List[int]] = [0, 0, 0]
+
+class PDFEditRequest(BaseModel):
+    pdf_data: str  # base64 encoded PDF
+    edits: List[PDFTextEditItem]
+    page_index: Optional[int] = 0
+
+@app.post("/edit-pdf-text")
+async def edit_pdf_text(request: PDFEditRequest):
+    """
+    Apply native text removals and replacements directly on the PDF first page
+    and re-render the page at 300 DPI.
+    """
+    pdf_doc = None
+    try:
+        # Decode base64 PDF
+        if ',' in request.pdf_data:
+            _, encoded = request.pdf_data.split(",", 1)
+        else:
+            encoded = request.pdf_data
+            
+        pdf_bytes = base64.b64decode(encoded)
+        pdf_doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        
+        if len(pdf_doc) == 0:
+            raise HTTPException(status_code=400, detail="PDF contains no pages")
+            
+        page = pdf_doc[request.page_index]
+        
+        # Add redactions for all items (both remove and replace require erasing original text)
+        for edit in request.edits:
+            if not edit.pdf_rect or len(edit.pdf_rect) < 4:
+                continue
+            x0, y0, x1, y1 = edit.pdf_rect
+            # Use exact text rectangle without opaque fill to preserve natural background color
+            rect = fitz.Rect(x0, y0, x1, y1)
+            page.add_redact_annot(rect)
+            
+        # Apply redactions to permanently remove original text objects without drawing opaque patches
+        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+        
+        # Re-insert replaced text with matching typography
+        for edit in request.edits:
+            if edit.action == "replace" and edit.new_text:
+                x0, y0, x1, y1 = edit.pdf_rect
+                rect = fitz.Rect(x0, y0, x1, y1)
+                
+                # Determine font name
+                fontname = "helv"
+                if edit.font_name:
+                    fn_lower = edit.font_name.lower()
+                    if ("bold" in fn_lower and "italic" in fn_lower) or "oblique" in fn_lower:
+                        fontname = "hebi"
+                    elif "bold" in fn_lower:
+                        fontname = "hebo"
+                    elif "italic" in fn_lower:
+                        fontname = "heit"
+                    elif "times" in fn_lower or "serif" in fn_lower:
+                        fontname = "tiro"
+                    elif "courier" in fn_lower or "mono" in fn_lower:
+                        fontname = "cour"
+                
+                # Normalize color [0..255] -> [0.0..1.0]
+                color_rgb = (0.0, 0.0, 0.0)
+                if edit.color and len(edit.color) >= 3:
+                    color_rgb = (
+                        float(edit.color[0]) / 255.0,
+                        float(edit.color[1]) / 255.0,
+                        float(edit.color[2]) / 255.0
+                    )
+                
+                fontsize = float(edit.font_size or 12.0)
+                
+                # Insert the replacement text
+                page.insert_textbox(
+                    rect,
+                    edit.new_text,
+                    fontsize=fontsize,
+                    fontname=fontname,
+                    color=color_rgb,
+                    align=fitz.TEXT_ALIGN_LEFT
+                )
+                
+        # Re-render page to 300 DPI high-quality pixmap
+        zoom = 300 / 72
+        matrix = fitz.Matrix(zoom, zoom)
+        pixmap = page.get_pixmap(matrix=matrix)
+        img_data = pixmap.tobytes("png")
+        pil_image = Image.open(io.BytesIO(img_data))
+        
+        if pil_image.mode in ("RGBA", "LA", "P"):
+            bg = Image.new("RGB", pil_image.size, (255, 255, 255))
+            if pil_image.mode == "P":
+                pil_image = pil_image.convert("RGBA")
+            bg.paste(pil_image, mask=pil_image.split()[-1] if pil_image.mode == "RGBA" else None)
+            pil_image = bg
+            
+        dominant_color = get_dominant_color(pil_image)
+        
+        # Resize to max 1200px
+        max_width = 1200
+        if pil_image.width > max_width:
+            ratio = max_width / pil_image.width
+            new_height = int(pil_image.height * ratio)
+            pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
+            
+        img_buffer = io.BytesIO()
+        pil_image.save(img_buffer, format="JPEG", quality=92, optimize=True)
+        img_buffer.seek(0)
+        
+        img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
+        data_url = f"data:image/jpeg;base64,{img_base64}"
+        
+        # Export updated PDF
+        pdf_out_buffer = io.BytesIO()
+        pdf_doc.save(pdf_out_buffer)
+        pdf_out_base64 = base64.b64encode(pdf_out_buffer.getvalue()).decode()
+        
+        return JSONResponse({
+            "success": True,
+            "message": "PDF text edited and rendered successfully",
+            "image_data": data_url,
+            "pdf_data": pdf_out_base64,
+            "dominant_color": dominant_color,
+            "image_size": {
+                "width": pil_image.width,
+                "height": pil_image.height
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error editing PDF text: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to edit PDF text: {str(e)}")
+    finally:
+        if pdf_doc:
+            try:
+                pdf_doc.close()
+            except:
+                pass
 
 if __name__ == "__main__":
     import uvicorn

@@ -70,6 +70,13 @@ function App() {
   const ocrAbortControllerRef = useRef<AbortController | null>(null);
   const [activeEdits, setActiveEdits] = useState<any[]>([]);
   const [appliedEdits, setAppliedEdits] = useState<any[]>([]);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [isPdfDoc, setIsPdfDoc] = useState<boolean>(false);
+  const [uploadedPdfFile, setUploadedPdfFile] = useState<File | Blob | null>(null);
+  const [hasNativePdfText, setHasNativePdfText] = useState<boolean>(false);
+  const [pdfRawData, setPdfRawData] = useState<string>('');
+  const [nativePdfTextBlocks, setNativePdfTextBlocks] = useState<any[]>([]);
+  const [pdfPageSize, setPdfPageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const [isEditingText, setIsEditingText] = useState<boolean>(false);
   const [isApplyingEdits, setIsApplyingEdits] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -218,13 +225,22 @@ function App() {
     setOcrStatus('idle');
     setActiveEdits([]);
     setAppliedEdits([]);
+    setIsPdfDoc(false);
+    setHasNativePdfText(false);
+    setPdfRawData('');
+    setNativePdfTextBlocks([]);
     setIsEditingText(false);
 
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const isPdf = file.type === 'application/pdf';
+      const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+      if (isPdf) {
+        setUploadedPdfFile(file);
+      } else {
+        setUploadedPdfFile(null);
+      }
       const endpoint = isPdf ? 'extract-pdf-image' : 'process-image';
 
       const res = await fetch(`${API_BASE_URL}/${endpoint}`, {
@@ -242,11 +258,30 @@ function App() {
           setImageWidth(data.image_size.width);
           setImageHeight(data.image_size.height);
         }
+        
+        const isPdfFile = Boolean(data.is_pdf);
+        const hasNative = Boolean(data.has_native_text && data.native_text_blocks && data.native_text_blocks.length > 0);
+        
+        setIsPdfDoc(isPdfFile);
+        setHasNativePdfText(hasNative);
+        setPdfRawData(data.pdf_data || '');
+        setNativePdfTextBlocks(data.native_text_blocks || []);
+        if (data.page_size) {
+          setPdfPageSize(data.page_size);
+        }
+
         // Immediately stop upload loading so image is displayed on the mockup canvas right away!
         setIsLoading(false);
 
-        // Run OCR in background without blocking image preview
-        triggerOcrDetection(data.image_data);
+        // Modal will NOT auto-open on upload; only opens when clicking "Edit PDF Text" or "Edit Image Text"
+        setActiveEdits([]);
+        setAppliedEdits([]);
+        setIsEditingText(false);
+
+        if (!isPdfFile || !hasNative) {
+          // Scanned PDF or Image: trigger background EasyOCR
+          triggerOcrDetection(data.image_data);
+        }
       } else {
         throw new Error(data.detail || 'Unknown error');
       }
@@ -258,30 +293,108 @@ function App() {
     }
   };
 
+  const handleApplyAprysePdf = async (modifiedPdfBlob: Blob) => {
+    setIsApplyingEdits(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', modifiedPdfBlob, 'modified.pdf');
+
+      const res = await fetch(`${API_BASE_URL}/extract-pdf-image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setImageUrl(data.image_data);
+        setOriginalImageUrl(data.image_data);
+        if (data.dominant_color) {
+          setDominantColor(data.dominant_color);
+        }
+        if (data.image_size) {
+          setImageWidth(data.image_size.width);
+          setImageHeight(data.image_size.height);
+        }
+        setUploadedPdfFile(modifiedPdfBlob);
+        setIsEditingText(false);
+      } else {
+        throw new Error(data.detail || 'Failed to render modified PDF');
+      }
+    } catch (err: any) {
+      console.error('Error applying Apryse PDF edits:', err);
+      alert('Error rendering modified PDF. Please try again.');
+    } finally {
+      setIsApplyingEdits(false);
+    }
+  };
+
   const handleApplyEdits = async (editsToApply = activeEdits, autoContinue = false) => {
     if (!originalImageUrl) return;
     setIsApplyingEdits(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/edit-image-text`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          image_data: originalImageUrl,
-          edits: editsToApply,
-        }),
-      });
+      if (isPdfDoc && hasNativePdfText && pdfRawData) {
+        // Native PDF text editing endpoint
+        const response = await fetch(`${API_BASE_URL}/edit-pdf-text`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            pdf_data: pdfRawData,
+            edits: editsToApply.map(e => ({
+              id: e.id,
+              pdf_rect: e.pdf_rect || [0, 0, 0, 0],
+              action: e.action,
+              new_text: e.new_text || '',
+              original_text: e.original_text || '',
+              font_size: e.font_size,
+              font_name: e.font_name,
+              color: e.color
+            })),
+            page_index: 0
+          }),
+        });
 
-      const data = await response.json();
-      if (data.success) {
-        setImageUrl(data.image_data);
-        setAppliedEdits(editsToApply);
-        if (autoContinue) {
-          setIsEditingText(false);
+        const data = await response.json();
+        if (data.success) {
+          setImageUrl(data.image_data);
+          setAppliedEdits(editsToApply);
+          if (data.dominant_color) {
+            setDominantColor(data.dominant_color);
+          }
+          if (data.image_size) {
+            setImageWidth(data.image_size.width);
+            setImageHeight(data.image_size.height);
+          }
+          if (autoContinue) {
+            setIsEditingText(false);
+          }
+        } else {
+          throw new Error(data.detail || 'Failed to edit PDF text');
         }
       } else {
-        throw new Error(data.detail || 'Failed to edit image text');
+        // Standard EasyOCR image inpainting endpoint
+        const response = await fetch(`${API_BASE_URL}/edit-image-text`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            image_data: originalImageUrl,
+            edits: editsToApply,
+          }),
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setImageUrl(data.image_data);
+          setAppliedEdits(editsToApply);
+          if (autoContinue) {
+            setIsEditingText(false);
+          }
+        } else {
+          throw new Error(data.detail || 'Failed to edit image text');
+        }
       }
     } catch (err: any) {
       console.error('Error applying edits:', err);
@@ -301,14 +414,19 @@ function App() {
     setOcrStatus('idle');
     setActiveEdits([]);
     setAppliedEdits([]);
+    setIsPdfDoc(false);
+    setHasNativePdfText(false);
+    setPdfRawData('');
+    setNativePdfTextBlocks([]);
+    setUploadedPdfFile(null);
     setIsEditingText(false);
     setIsApplyingEdits(false);
     setEditingId(null);
     setEditingTextVal('');
-    setFileName('');
-    setIsLoading(false);
-    setError('');
     setDominantColor('');
+    setFileName('');
+    setError('');
+    setIsLoading(false);
     setCoverScale(1.0);
     setCoverPosition('0px');
     setCoverLeft('0px');
@@ -1220,10 +1338,10 @@ function App() {
                     </button>
                     <button
                       onClick={handleReset}
-                      className="p-1 hover:bg-indigo-50/80 dark:hover:bg-[#181836] rounded-lg transition-colors group"
-                      title="Reset File"
+                      className="p-1 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors group"
+                      title="Reset / Clear Uploaded File"
                     >
-                      <RotateCcw className="w-3.5 h-3.5 text-brand group-hover:text-indigo-600 dark:group-hover:text-white transition-colors" />
+                      <RotateCcw className="w-3.5 h-3.5 text-slate-400 group-hover:text-red-500 transition-colors" />
                     </button>
                   </div>
                 </div>
@@ -1339,9 +1457,14 @@ function App() {
                   <button
                     onClick={openTextEditor}
                     className="bg-white/80 dark:bg-[#080814]/80 hover:bg-indigo-50 dark:hover:bg-[#151532] backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] hover:border-indigo-300 dark:hover:border-[#2b2b54] text-brand dark:text-indigo-300 font-semibold text-[11px] px-3.5 py-1.5 rounded-full shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5"
-                    title="Edit or Remove Image Text Content via OCR"
+                    title={isPdfDoc && hasNativePdfText ? "Edit Native PDF Page 1 Text" : "Edit or Remove Image Text Content via OCR"}
                   >
-                    {ocrStatus === 'scanning' ? (
+                    {isPdfDoc && hasNativePdfText ? (
+                      <>
+                        <FileText className="w-3.5 h-3.5 text-brand" />
+                        <span>Edit PDF Text</span>
+                      </>
+                    ) : ocrStatus === 'scanning' ? (
                       <>
                         <span className="relative flex h-2 w-2 mr-0.5">
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
@@ -1527,8 +1650,8 @@ function App() {
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={handleReset}
-                    className="bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow"
-                    title="Reset Preview"
+                    className="bg-red-500/10 dark:bg-red-950/30 hover:bg-red-500 dark:hover:bg-red-600 border border-red-500/30 dark:border-red-800/40 hover:border-red-500 text-red-600 dark:text-red-400 hover:text-white dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow-[0_2px_10px_rgba(239,68,68,0.25)]"
+                    title="Reset All Work & Clear File"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Reset</span>
@@ -2038,388 +2161,587 @@ function App() {
         </div>
       </footer>
 
-      {/* OCR Text Editing Modal Popup */}
-      {isEditingText && (
-        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300">
-          <div className="bg-white dark:bg-[#0c0c1c] border border-slate-200 dark:border-[#1c1c38] rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-6 gap-5">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#1a1a32]">
-              <div>
-                <div className="flex items-center space-x-2.5">
-                  <h3 className="text-lg font-bold text-slate-800 dark:text-white font-['Outfit'] flex items-center">
-                    <Zap className="w-5 h-5 mr-2 text-brand" />
-                    OCR Text Editor Step
-                  </h3>
-                  {ocrStatus === 'scanning' && (
-                    <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 animate-pulse">
-                      <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+      {/* Document Text Editing Modal Popup (Clean Native PDF & OCR) */}
+      {isEditingText && (() => {
+        const isNativePdf = Boolean(isPdfDoc && hasNativePdfText && nativePdfTextBlocks && nativePdfTextBlocks.length > 0);
+        const displayedItems = isNativePdf ? nativePdfTextBlocks : ocrResults;
+
+        return (
+          <div 
+            className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300"
+            onClick={() => setSelectedBlockId(null)}
+          >
+            <div 
+              className="bg-white dark:bg-[#0c0c1c] border border-slate-200 dark:border-[#1c1c38] rounded-3xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-hidden flex flex-col p-6 gap-5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-[#1a1a32]">
+                <div>
+                  <div className="flex items-center space-x-2.5">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white font-['Outfit'] flex items-center">
+                      {isNativePdf ? (
+                        <>
+                          <FileText className="w-5 h-5 mr-2 text-brand" />
+                          PDF Content Editor
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-5 h-5 mr-2 text-brand" />
+                          OCR Text Editor Step
+                        </>
+                      )}
+                    </h3>
+                    {isNativePdf ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-500/10 text-sky-400 border border-sky-500/25">
+                        <span>{nativePdfTextBlocks.length} editable text block{nativePdfTextBlocks.length === 1 ? '' : 's'}</span>
                       </span>
-                      <span>AI Scanning in Progress</span>
-                    </span>
-                  )}
-                  {ocrStatus === 'ready' && (
-                    <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-                      <span>{ocrResults.length} text region{ocrResults.length === 1 ? '' : 's'} detected</span>
-                    </span>
-                  )}
+                    ) : ocrStatus === 'scanning' ? (
+                      <span className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 animate-pulse">
+                        <span className="relative flex h-1.5 w-1.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-indigo-500"></span>
+                        </span>
+                        <span>AI Scanning in Progress</span>
+                      </span>
+                    ) : ocrStatus === 'ready' ? (
+                      <span className="inline-flex items-center space-x-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                        <span>{ocrResults.length} text region{ocrResults.length === 1 ? '' : 's'} detected</span>
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {isNativePdf 
+                      ? 'Click on any text block on Page 1 to select, edit inline, or delete.'
+                      : 'Detect, remove or edit text from your source document page before generating mockup creatives.'}
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  Detect, remove or edit text from your source document page before generating mockup creatives.
-                </p>
-              </div>
-              <button 
-                onClick={() => {
-                  setActiveEdits(appliedEdits);
-                  setIsEditingText(false);
-                }}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-[#181836] rounded-xl transition-all"
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            
-            {/* Modal Body: Split view */}
-            <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-6">
-              {/* Left Side: Interactive Preview with Scanning Laser */}
-              <div className="flex-1 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950/40 rounded-2xl p-4 border border-slate-200 dark:border-[#1c1c38] relative overflow-hidden">
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 w-full text-left flex items-center justify-between">
-                  <span className="flex items-center">
-                    <ImageIcon className="w-4 h-4 mr-1.5 text-brand" />
-                    Interactive Image Map
-                  </span>
-                  {ocrStatus === 'scanning' && (
-                    <span className="text-[10px] text-brand font-medium flex items-center space-x-1">
-                      <Sparkles className="w-3 h-3 animate-spin" />
-                      <span>Scanning text layers...</span>
-                    </span>
-                  )}
-                </h4>
-                <div className="relative max-w-full max-h-[380px] flex items-center justify-center select-none" style={{ aspectRatio: `${imageWidth}/${imageHeight}` }}>
-                  <img 
-                    src={originalImageUrl} 
-                    alt="Original for OCR" 
-                    className="max-w-full max-h-[330px] object-contain rounded-lg shadow-md"
-                  />
-
-                  {/* AI Laser Scanning Effect Overlay */}
-                  {ocrStatus === 'scanning' && (
-                    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-lg z-20 flex items-center justify-center">
-                      {/* Laser Beam moving up and down */}
-                      <div className="absolute left-0 right-0 h-24 bg-gradient-to-b from-transparent via-indigo-500/20 to-transparent animate-ocr-laser pointer-events-none">
-                        <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-400 via-indigo-400 to-transparent shadow-[0_0_12px_rgba(99,102,241,1),0_0_24px_rgba(6,182,212,0.8)]"></div>
-                      </div>
-                      
-                      {/* Cyberpunk grid background scan texture */}
-                      <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:16px_16px] opacity-25 pointer-events-none"></div>
-
-                      {/* Floating Badge in Center */}
-                      <div className="absolute bottom-3 bg-slate-900/90 dark:bg-[#090915]/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-indigo-500/30 flex items-center space-x-2 text-[11px] text-indigo-200 shadow-2xl pointer-events-none animate-pulse">
-                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-400"></div>
-                        <span className="font-semibold">Detecting document text...</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Bounding box overlays */}
-                  {ocrStatus === 'ready' && ocrResults.map((item) => {
-                    const xs = item.box.map((pt: any) => pt[0]);
-                    const ys = item.box.map((pt: any) => pt[1]);
-                    const minX = Math.min(...xs);
-                    const minY = Math.min(...ys);
-                    const maxX = Math.max(...xs);
-                    const maxY = Math.max(...ys);
-                    
-                    const left = (minX / imageWidth) * 100;
-                    const top = (minY / imageHeight) * 100;
-                    const width = ((maxX - minX) / imageWidth) * 100;
-                    const height = ((maxY - minY) / imageHeight) * 100;
-                    
-                    const edit = activeEdits.find(e => e.id === item.id);
-                    const isRemoved = edit?.action === 'remove';
-                    const isEdited = edit?.action === 'replace';
-                    
-                    let borderClass = "border-indigo-500/50 hover:border-indigo-400 hover:bg-indigo-500/10";
-                    if (isRemoved) borderClass = "border-red-500/80 bg-red-500/15 hover:border-red-400";
-                    if (isEdited) borderClass = "border-emerald-500/80 bg-emerald-500/15 hover:border-emerald-400";
-                    
-                    return (
-                      <div 
-                        key={item.id}
-                        className={`absolute border rounded cursor-pointer transition-all flex items-center justify-center ${borderClass}`}
-                        style={{
-                          left: `${left}%`,
-                          top: `${top}%`,
-                          width: `${width}%`,
-                          height: `${height}%`,
-                          transform: `rotate(${item.angle}deg)`,
-                          transformOrigin: 'center',
-                        }}
-                        title={`Original: "${item.text}"`}
-                        onClick={() => {
-                          setEditingId(item.id);
-                          setEditingTextVal(isEdited ? edit.new_text : item.text);
-                        }}
-                      >
-                        {isRemoved && <span className="text-[8px] font-bold text-red-400 bg-slate-900/85 px-1 py-0.5 rounded leading-none font-mono">X</span>}
-                        {isEdited && <span className="text-[8px] font-bold text-emerald-400 bg-slate-900/85 px-1 py-0.5 rounded leading-none font-mono">✓</span>}
-                      </div>
-                    );
-                  })}
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 text-center">
-                  {ocrStatus === 'scanning' 
-                    ? 'AI is analyzing text regions in the background. Detected boxes will appear shortly.' 
-                    : 'Hover over bounding boxes to see original text. Click any box to edit or remove it.'}
-                </p>
+                <button 
+                  onClick={() => {
+                    setActiveEdits(appliedEdits);
+                    setIsEditingText(false);
+                    setSelectedBlockId(null);
+                  }}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-2 hover:bg-slate-100 dark:hover:bg-[#181836] rounded-xl transition-all"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
               
-              {/* Right Side: Text lines list & edits */}
-              <div className="w-full md:w-80 flex flex-col gap-4 min-h-0">
-                <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
-                  <span>Detected Text Regions {ocrStatus === 'ready' ? `(${ocrResults.length})` : ''}</span>
-                </h4>
+              {/* Modal Body: Split view */}
+              <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-6">
+                {/* Left Side: Interactive Preview */}
+                <div 
+                  className="flex-1 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-950/40 rounded-2xl p-4 border border-slate-200 dark:border-[#1c1c38] relative overflow-hidden"
+                  onClick={() => setSelectedBlockId(null)}
+                >
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-3 w-full text-left flex items-center justify-between">
+                    <span className="flex items-center">
+                      <ImageIcon className="w-4 h-4 mr-1.5 text-brand" />
+                      {isNativePdf ? 'PDF Page 1 Canvas' : 'Interactive Image Map'}
+                    </span>
+                    {!isNativePdf && ocrStatus === 'scanning' && (
+                      <span className="text-[10px] text-brand font-medium flex items-center space-x-1">
+                        <Sparkles className="w-3 h-3 animate-spin" />
+                        <span>Scanning text layers...</span>
+                      </span>
+                    )}
+                  </h4>
+                  <div className="relative max-w-full max-h-[400px] flex items-center justify-center select-none" style={{ aspectRatio: `${imageWidth}/${imageHeight}` }}>
+                    <img 
+                      src={originalImageUrl} 
+                      alt={isNativePdf ? "PDF Page 1" : "Original for OCR"} 
+                      className="max-w-full max-h-[350px] object-contain rounded-lg shadow-md"
+                    />
 
-                {/* Scanning Skeleton State */}
-                {ocrStatus === 'scanning' && (
-                  <div className="flex-1 flex flex-col justify-center items-center gap-3.5 p-4 bg-slate-50/70 dark:bg-[#101026] rounded-2xl border border-dashed border-indigo-300/40 dark:border-[#24244d] text-center min-h-[260px]">
-                    <div className="relative flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
-                      <Zap className="w-5 h-5 text-brand absolute" />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Analyzing Document Text</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[220px] leading-relaxed">
-                        AI OCR is reading text layers and coordinates in the background...
-                      </p>
-                    </div>
-                    {/* Shimmer skeleton lines */}
-                    <div className="w-full space-y-2 mt-2">
-                      <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-full"></div>
-                      <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-5/6 mx-auto"></div>
-                      <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-full"></div>
-                    </div>
-                  </div>
-                )}
+                    {/* AI Laser Scanning Effect Overlay (for OCR mode) */}
+                    {!isNativePdf && ocrStatus === 'scanning' && (
+                      <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-lg z-20 flex items-center justify-center">
+                        <div className="absolute left-0 right-0 h-24 bg-gradient-to-b from-transparent via-indigo-500/20 to-transparent animate-ocr-laser pointer-events-none">
+                          <div className="w-full h-[2px] bg-gradient-to-r from-transparent via-cyan-400 via-indigo-400 to-transparent shadow-[0_0_12px_rgba(99,102,241,1),0_0_24px_rgba(6,182,212,0.8)]"></div>
+                        </div>
+                        <div className="absolute inset-0 bg-[radial-gradient(#6366f1_1px,transparent_1px)] [background-size:16px_16px] opacity-25 pointer-events-none"></div>
+                        <div className="absolute bottom-3 bg-slate-900/90 dark:bg-[#090915]/95 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-indigo-500/30 flex items-center space-x-2 text-[11px] text-indigo-200 shadow-2xl pointer-events-none animate-pulse">
+                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-indigo-400"></div>
+                          <span className="font-semibold">Detecting document text...</span>
+                        </div>
+                      </div>
+                    )}
 
-                {/* Error State */}
-                {ocrStatus === 'error' && (
-                  <div className="flex-1 flex flex-col justify-center items-center gap-3 p-4 bg-red-50/50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-900/40 text-center min-h-[220px]">
-                    <AlertCircle className="w-8 h-8 text-red-400" />
-                    <p className="text-xs font-semibold text-red-600 dark:text-red-300">OCR Detection Failed</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      Could not detect text regions. You can retry the OCR scan.
-                    </p>
-                    <button
-                      onClick={() => triggerOcrDetection(originalImageUrl)}
-                      className="mt-2 inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5" />
-                      <span>Retry Scan</span>
-                    </button>
-                  </div>
-                )}
+                    {/* Bounding box overlays */}
+                    {(isNativePdf || ocrStatus === 'ready') && displayedItems.map((item: any) => {
+                      let left = 0;
+                      let top = 0;
+                      let width = 0;
+                      let height = 0;
+                      let transform = 'none';
 
-                {/* Empty State when no text detected */}
-                {ocrStatus === 'ready' && ocrResults.length === 0 && (
-                  <div className="flex-1 flex flex-col justify-center items-center gap-2.5 p-4 bg-slate-50 dark:bg-[#101026] rounded-2xl border border-slate-200 dark:border-[#1c1c38] text-center min-h-[220px]">
-                    <CheckCircle className="w-8 h-8 text-slate-400" />
-                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No Text Detected</p>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[200px]">
-                      No readable text was found in this document page.
-                    </p>
-                  </div>
-                )}
-
-                {/* Ready State with detected text list */}
-                {ocrStatus === 'ready' && ocrResults.length > 0 && (
-                  <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 max-h-[350px]">
-                    {ocrResults.map((item) => {
+                      if (isNativePdf && item.rel_box) {
+                        left = item.rel_box.left;
+                        top = item.rel_box.top;
+                        width = item.rel_box.width;
+                        height = item.rel_box.height;
+                      } else if (item.box) {
+                        const xs = item.box.map((pt: any) => pt[0]);
+                        const ys = item.box.map((pt: any) => pt[1]);
+                        const minX = Math.min(...xs);
+                        const minY = Math.min(...ys);
+                        const maxX = Math.max(...xs);
+                        const maxY = Math.max(...ys);
+                        left = (minX / imageWidth) * 100;
+                        top = (minY / imageHeight) * 100;
+                        width = ((maxX - minX) / imageWidth) * 100;
+                        height = ((maxY - minY) / imageHeight) * 100;
+                        transform = `rotate(${item.angle || 0}deg)`;
+                      }
+                      
                       const edit = activeEdits.find(e => e.id === item.id);
                       const isRemoved = edit?.action === 'remove';
                       const isEdited = edit?.action === 'replace';
+                      const isSelected = selectedBlockId === item.id;
+                      const isCurrentlyEditing = editingId === item.id;
                       
-                      if (editingId === item.id) {
-                        return (
-                          <div key={item.id} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-indigo-50/50 dark:bg-[#1a1a36] border border-indigo-200 dark:border-indigo-850">
-                            <span className="text-[10px] text-slate-500 font-semibold uppercase">Edit Text content</span>
-                            <input 
-                              type="text" 
-                              value={editingTextVal} 
-                              onChange={(e) => setEditingTextVal(e.target.value)} 
-                              className="premium-input text-xs w-full py-1 px-2"
-                              autoFocus
-                            />
-                            <div className="flex items-center space-x-1.5 justify-end mt-1">
-                              <button 
-                                onClick={() => {
-                                  const updatedEdits = activeEdits.filter(e => e.id !== item.id);
-                                  updatedEdits.push({
-                                    id: item.id,
-                                    box: item.box,
-                                    action: 'replace',
-                                    new_text: editingTextVal,
-                                    original_text: item.text,
-                                    angle: item.angle,
-                                    color: item.color,
-                                    width: item.width,
-                                    height: item.height
-                                  });
-                                  setActiveEdits(updatedEdits);
-                                  setEditingId(null);
-                                }}
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
-                              >
-                                Save
-                              </button>
-                              <button 
-                                onClick={() => setEditingId(null)}
-                                className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      }
+                      let borderClass = isNativePdf 
+                        ? (isSelected 
+                            ? "border-2 border-dashed border-sky-500 bg-sky-500/15 z-30" 
+                            : "border border-dashed border-sky-400/60 hover:border-sky-500 hover:bg-sky-500/10")
+                        : "border-indigo-500/50 hover:border-indigo-400 hover:bg-indigo-500/10";
+                      
+                      if (isRemoved) borderClass = "border-2 border-dashed border-red-500/80 bg-red-500/15";
+                      if (isEdited && !isSelected) borderClass = "border-2 border-dashed border-emerald-500/80 bg-emerald-500/15";
                       
                       return (
-                        <div key={item.id} className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
-                          isRemoved 
-                            ? 'bg-red-500/10 border-red-500/20' 
-                            : isEdited 
-                            ? 'bg-emerald-500/10 border-emerald-500/20' 
-                            : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/50 dark:border-[#171732]'
-                        }`}>
-                          <div className="flex flex-col min-w-0 pr-2">
-                            <span className={`text-xs font-medium text-slate-750 dark:text-slate-200 truncate ${isRemoved ? 'line-through opacity-50' : ''}`}>
-                              {isEdited ? edit.new_text : item.text}
-                            </span>
-                            {isEdited && (
-                              <span className="text-[9px] text-slate-400 line-through truncate">
-                                orig: {item.text}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-1.5 flex-shrink-0">
-                            <button
-                              onClick={() => {
-                                setEditingId(item.id);
-                                setEditingTextVal(isEdited ? edit.new_text : item.text);
-                              }}
-                              disabled={isRemoved}
-                              title="Edit text"
-                              className="p-1 text-slate-400 hover:text-brand dark:hover:text-indigo-400 disabled:opacity-30 disabled:pointer-events-none transition-all hover:scale-110 active:scale-95"
+                        <div 
+                          key={item.id}
+                          className={`absolute rounded cursor-pointer transition-all flex items-center justify-center ${borderClass}`}
+                          style={{
+                            left: `${left}%`,
+                            top: `${top}%`,
+                            width: `${width}%`,
+                            height: `${height}%`,
+                            transform: transform,
+                            transformOrigin: 'center',
+                          }}
+                          title={`Click to select: "${item.text}"`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedBlockId(item.id);
+                          }}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedBlockId(item.id);
+                            setEditingId(item.id);
+                            setEditingTextVal(isEdited ? edit.new_text : item.text);
+                          }}
+                        >
+                          {/* 8 Resize Handle Dots (when selected) */}
+                          {isSelected && isNativePdf && !isCurrentlyEditing && (
+                            <>
+                              <span className="absolute -top-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute top-1/2 -translate-y-1/2 -left-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+                              <span className="absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
+
+                              {/* Floating Action Menu below selected box */}
+                              <div 
+                                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-40 bg-white dark:bg-[#121226] border border-slate-300 dark:border-[#2b2b54] shadow-2xl rounded-xl px-2 py-1.5 flex items-center space-x-2 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                                onClick={(ev) => ev.stopPropagation()}
+                              >
+                                <button
+                                  onClick={() => {
+                                    setEditingId(item.id);
+                                    setEditingTextVal(isEdited ? edit.new_text : item.text);
+                                  }}
+                                  className="p-1 text-slate-700 dark:text-slate-200 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg transition-all"
+                                  title="Edit text content"
+                                >
+                                  <Pencil className="w-4 h-4 text-sky-500" />
+                                </button>
+                                <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700"></div>
+                                <button
+                                  onClick={() => {
+                                    const exists = activeEdits.find(e => e.id === item.id);
+                                    if (exists && exists.action === 'remove') {
+                                      setActiveEdits(activeEdits.filter(e => e.id !== item.id));
+                                    } else {
+                                      const updated = activeEdits.filter(e => e.id !== item.id);
+                                      updated.push({
+                                        id: item.id,
+                                        pdf_rect: item.pdf_rect,
+                                        action: 'remove',
+                                        original_text: item.text,
+                                        font_size: item.font_size,
+                                        font_name: item.font_name,
+                                        color: item.color
+                                      });
+                                      setActiveEdits(updated);
+                                    }
+                                  }}
+                                  className={`p-1 rounded-lg transition-all ${
+                                    isRemoved 
+                                      ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/30' 
+                                      : 'text-slate-700 dark:text-slate-200 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30'
+                                  }`}
+                                  title={isRemoved ? "Undo delete" : "Delete text"}
+                                >
+                                  {isRemoved ? <RotateCcw className="w-4 h-4 text-amber-500" /> : <Trash2 className="w-4 h-4 text-red-500" />}
+                                </button>
+                              </div>
+                            </>
+                          )}
+
+                          {/* Direct In-Place Input Editor */}
+                          {isCurrentlyEditing ? (
+                            <div 
+                              className="absolute inset-0 bg-white dark:bg-[#121226] z-50 rounded border-2 border-sky-500 p-0.5 shadow-lg flex items-center"
+                              onClick={(ev) => ev.stopPropagation()}
                             >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => {
-                                const exists = activeEdits.find(e => e.id === item.id);
-                                if (exists && exists.action === 'remove') {
-                                  setActiveEdits(activeEdits.filter(e => e.id !== item.id));
-                                } else {
-                                  const updatedEdits = activeEdits.filter(e => e.id !== item.id);
-                                  updatedEdits.push({
-                                    id: item.id,
-                                    box: item.box,
-                                    action: 'remove',
-                                    original_text: item.text
-                                  });
-                                  setActiveEdits(updatedEdits);
-                                }
-                              }}
-                              title={isRemoved ? "Undo removal" : "Remove text"}
-                              className={`p-1 transition-all hover:scale-110 active:scale-95 ${
-                                isRemoved 
-                                  ? 'text-amber-500 hover:text-amber-600 dark:hover:text-amber-400' 
-                                  : 'text-slate-400 hover:text-red-500 dark:hover:text-red-400'
-                              }`}
-                            >
-                              {isRemoved ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
-                            </button>
-                          </div>
+                              <input 
+                                type="text"
+                                value={editingTextVal}
+                                onChange={(ev) => setEditingTextVal(ev.target.value)}
+                                onKeyDown={(ev) => {
+                                  if (ev.key === 'Enter') {
+                                    const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                    if (isNativePdf) {
+                                      updatedEdits.push({
+                                        id: item.id,
+                                        pdf_rect: item.pdf_rect,
+                                        action: 'replace',
+                                        new_text: editingTextVal,
+                                        original_text: item.text,
+                                        font_size: item.font_size,
+                                        font_name: item.font_name,
+                                        color: item.color
+                                      });
+                                    } else {
+                                      updatedEdits.push({
+                                        id: item.id,
+                                        box: item.box,
+                                        action: 'replace',
+                                        new_text: editingTextVal,
+                                        original_text: item.text,
+                                        angle: item.angle,
+                                        color: item.color,
+                                        width: item.width,
+                                        height: item.height
+                                      });
+                                    }
+                                    setActiveEdits(updatedEdits);
+                                    setEditingId(null);
+                                  } else if (ev.key === 'Escape') {
+                                    setEditingId(null);
+                                  }
+                                }}
+                                className="w-full h-full bg-transparent text-slate-900 dark:text-white text-xs font-semibold px-1 focus:outline-none"
+                                autoFocus
+                              />
+                            </div>
+                          ) : isRemoved ? (
+                            <span className="text-[8px] font-bold text-red-400 bg-slate-900/85 px-1 py-0.5 rounded leading-none font-mono">X</span>
+                          ) : isEdited ? (
+                            <span className="text-[8px] font-bold text-emerald-400 bg-slate-900/85 px-1 py-0.5 rounded leading-none font-mono">✓</span>
+                          ) : null}
                         </div>
                       );
                     })}
                   </div>
-                )}
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 text-center">
+                    {isNativePdf 
+                      ? 'Click on any text box to reveal Edit & Delete options, or double-click to edit directly.'
+                      : (!isNativePdf && ocrStatus === 'scanning')
+                      ? 'AI is analyzing text regions in the background. Detected boxes will appear shortly.' 
+                      : 'Click any box on Page 1 or from the list to select, edit, or delete.'}
+                  </p>
+                </div>
                 
-                {/* Modal actions sidebar bottom */}
-                {ocrStatus === 'ready' && ocrResults.length > 0 && (
-                  <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3 flex flex-col gap-2">
-                    <div className="flex items-center gap-2">
+                {/* Right Side: Text lines list & edits */}
+                <div className="w-full md:w-80 flex flex-col gap-4 min-h-0">
+                  <h4 className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                    <span>{isNativePdf ? 'PDF Page 1 Text Blocks' : 'Detected Text Regions'} ({displayedItems.length})</span>
+                  </h4>
+
+                  {/* Scanning Skeleton State (OCR only) */}
+                  {!isNativePdf && ocrStatus === 'scanning' && (
+                    <div className="flex-1 flex flex-col justify-center items-center gap-3.5 p-4 bg-slate-50/70 dark:bg-[#101026] rounded-2xl border border-dashed border-indigo-300/40 dark:border-[#24244d] text-center min-h-[260px]">
+                      <div className="relative flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-full border-2 border-indigo-500/20 border-t-indigo-500 animate-spin"></div>
+                        <Zap className="w-5 h-5 text-brand absolute" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200">Analyzing Document Text</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[220px] leading-relaxed">
+                          AI OCR is reading text layers and coordinates in the background...
+                        </p>
+                      </div>
+                      <div className="w-full space-y-2 mt-2">
+                        <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-full"></div>
+                        <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-5/6 mx-auto"></div>
+                        <div className="h-7 bg-indigo-500/10 dark:bg-indigo-950/40 rounded-lg animate-pulse w-full"></div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {!isNativePdf && ocrStatus === 'error' && (
+                    <div className="flex-1 flex flex-col justify-center items-center gap-3 p-4 bg-red-50/50 dark:bg-red-950/20 rounded-2xl border border-red-200 dark:border-red-900/40 text-center min-h-[220px]">
+                      <AlertCircle className="w-8 h-8 text-red-400" />
+                      <p className="text-xs font-semibold text-red-600 dark:text-red-300">OCR Detection Failed</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                        Could not detect text regions. You can retry the OCR scan.
+                      </p>
                       <button
-                        onClick={() => {
-                          const allRemoves = ocrResults.map(item => ({
-                            id: item.id,
-                            box: item.box,
-                            action: 'remove',
-                            original_text: item.text
-                          }));
-                          setActiveEdits(allRemoves);
-                        }}
-                        className="flex-1 py-1.5 text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 hover:border-red-500/60 rounded-xl transition-all shadow-sm active:scale-[0.99]"
+                        onClick={() => triggerOcrDetection(originalImageUrl)}
+                        className="mt-2 inline-flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl transition-colors shadow-sm"
                       >
-                        Remove All Text
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          setActiveEdits([]);
-                          setAppliedEdits([]);
-                          setImageUrl(originalImageUrl);
-                        }}
-                        className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-xl transition-colors"
-                      >
-                        Reset
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Retry Scan</span>
                       </button>
                     </div>
-                  </div>
-                )}
+                  )}
+
+                  {/* Empty State when no text detected */}
+                  {(isNativePdf || ocrStatus === 'ready') && displayedItems.length === 0 && (
+                    <div className="flex-1 flex flex-col justify-center items-center gap-2.5 p-4 bg-slate-50 dark:bg-[#101026] rounded-2xl border border-slate-200 dark:border-[#1c1c38] text-center min-h-[220px]">
+                      <CheckCircle className="w-8 h-8 text-slate-400" />
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">No Text Detected</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[200px]">
+                        No editable text was found in this document page.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Ready State with detected text list */}
+                  {(isNativePdf || ocrStatus === 'ready') && displayedItems.length > 0 && (
+                    <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 max-h-[350px]">
+                      {displayedItems.map((item: any) => {
+                        const edit = activeEdits.find(e => e.id === item.id);
+                        const isRemoved = edit?.action === 'remove';
+                        const isEdited = edit?.action === 'replace';
+                        
+                        if (editingId === item.id) {
+                          return (
+                            <div key={item.id} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-indigo-50/50 dark:bg-[#1a1a36] border border-indigo-200 dark:border-indigo-850">
+                              <span className="text-[10px] text-slate-500 font-semibold uppercase">Edit Text content</span>
+                              <input 
+                                type="text" 
+                                value={editingTextVal} 
+                                onChange={(e) => setEditingTextVal(e.target.value)} 
+                                className="premium-input text-xs w-full py-1 px-2"
+                                autoFocus
+                              />
+                              <div className="flex items-center space-x-1.5 justify-end mt-1">
+                                <button 
+                                  onClick={() => {
+                                    const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                    if (isNativePdf) {
+                                      updatedEdits.push({
+                                        id: item.id,
+                                        pdf_rect: item.pdf_rect,
+                                        action: 'replace',
+                                        new_text: editingTextVal,
+                                        original_text: item.text,
+                                        font_size: item.font_size,
+                                        font_name: item.font_name,
+                                        color: item.color
+                                      });
+                                    } else {
+                                      updatedEdits.push({
+                                        id: item.id,
+                                        box: item.box,
+                                        action: 'replace',
+                                        new_text: editingTextVal,
+                                        original_text: item.text,
+                                        angle: item.angle,
+                                        color: item.color,
+                                        width: item.width,
+                                        height: item.height
+                                      });
+                                    }
+                                    setActiveEdits(updatedEdits);
+                                    setEditingId(null);
+                                  }}
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                                >
+                                  Save
+                                </button>
+                                <button 
+                                  onClick={() => setEditingId(null)}
+                                  className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        return (
+                          <div key={item.id} className={`p-2.5 rounded-xl border flex items-center justify-between transition-colors ${
+                            isRemoved 
+                              ? 'bg-red-500/10 border-red-500/20' 
+                              : isEdited 
+                              ? 'bg-emerald-500/10 border-emerald-500/20' 
+                              : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/50 dark:border-[#171732]'
+                          }`}>
+                            <div className="flex flex-col min-w-0 pr-2">
+                              <span className={`text-xs font-medium text-slate-750 dark:text-slate-200 truncate ${isRemoved ? 'line-through opacity-50' : ''}`}>
+                                {isEdited ? edit.new_text : item.text}
+                              </span>
+                              {isEdited && (
+                                <span className="text-[9px] text-slate-400 line-through truncate">
+                                  orig: {item.text}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center space-x-1.5 flex-shrink-0">
+                              <button
+                                onClick={() => {
+                                  setEditingId(item.id);
+                                  setEditingTextVal(isEdited ? edit.new_text : item.text);
+                                }}
+                                disabled={isRemoved}
+                                title="Edit text"
+                                className="p-1 text-slate-400 hover:text-brand dark:hover:text-indigo-400 disabled:opacity-30 disabled:pointer-events-none transition-all hover:scale-110 active:scale-95"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const exists = activeEdits.find(e => e.id === item.id);
+                                  if (exists && exists.action === 'remove') {
+                                    setActiveEdits(activeEdits.filter(e => e.id !== item.id));
+                                  } else {
+                                    const updatedEdits = activeEdits.filter(e => e.id !== item.id);
+                                    if (isNativePdf) {
+                                      updatedEdits.push({
+                                        id: item.id,
+                                        pdf_rect: item.pdf_rect,
+                                        action: 'remove',
+                                        original_text: item.text,
+                                        font_size: item.font_size,
+                                        font_name: item.font_name,
+                                        color: item.color
+                                      });
+                                    } else {
+                                      updatedEdits.push({
+                                        id: item.id,
+                                        box: item.box,
+                                        action: 'remove',
+                                        original_text: item.text
+                                      });
+                                    }
+                                    setActiveEdits(updatedEdits);
+                                  }
+                                }}
+                                title={isRemoved ? "Undo deletion" : "Delete text"}
+                                className={`p-1 transition-all hover:scale-110 active:scale-95 ${
+                                  isRemoved 
+                                    ? 'text-amber-500 hover:text-amber-600 dark:hover:text-amber-400' 
+                                    : 'text-slate-400 hover:text-red-500 dark:hover:text-red-400'
+                                }`}
+                              >
+                                {isRemoved ? <RotateCcw className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  
+                  {/* Modal actions sidebar bottom */}
+                  {(isNativePdf || ocrStatus === 'ready') && displayedItems.length > 0 && (
+                    <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            if (isNativePdf) {
+                              const allRemoves = nativePdfTextBlocks.map((item: any) => ({
+                                id: item.id,
+                                pdf_rect: item.pdf_rect,
+                                action: 'remove',
+                                original_text: item.text,
+                                font_size: item.font_size,
+                                font_name: item.font_name,
+                                color: item.color
+                              }));
+                              setActiveEdits(allRemoves);
+                            } else {
+                              const allRemoves = ocrResults.map((item: any) => ({
+                                id: item.id,
+                                box: item.box,
+                                action: 'remove',
+                                original_text: item.text
+                              }));
+                              setActiveEdits(allRemoves);
+                            }
+                          }}
+                          className="flex-1 py-1.5 text-xs font-semibold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 hover:border-red-500/60 rounded-xl transition-all shadow-sm active:scale-[0.99]"
+                        >
+                          Delete All Text
+                        </button>
+                        
+                        <button
+                          onClick={() => {
+                            setActiveEdits([]);
+                            setAppliedEdits([]);
+                            setImageUrl(originalImageUrl);
+                          }}
+                          className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 dark:bg-[#151532] text-slate-650 dark:text-slate-350 hover:bg-slate-200 dark:hover:bg-[#1a1a3e] border border-slate-200 dark:border-[#2b2b5a] rounded-xl transition-colors"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Modal Footer */}
+              <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3.5 flex items-center justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setActiveEdits(appliedEdits);
+                    setIsEditingText(false);
+                  }}
+                  disabled={isApplyingEdits}
+                  className="px-4 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-50"
+                >
+                  Continue without changes
+                </button>
+                <button
+                  onClick={async () => {
+                    if (activeEdits.length > 0) {
+                      await handleApplyEdits(activeEdits, true);
+                    } else {
+                      setAppliedEdits([]);
+                      setImageUrl(originalImageUrl);
+                      setIsEditingText(false);
+                    }
+                  }}
+                  disabled={isApplyingEdits || (!isNativePdf && ocrStatus === 'scanning')}
+                  className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
+                >
+                  {isApplyingEdits ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                      <span>Applying...</span>
+                    </>
+                  ) : (
+                    <span>Apply & Continue</span>
+                  )}
+                </button>
               </div>
             </div>
-            
-            {/* Modal Footer */}
-            <div className="border-t border-slate-200 dark:border-[#1a1a32] pt-3.5 flex items-center justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setActiveEdits(appliedEdits);
-                  setIsEditingText(false);
-                }}
-                disabled={isApplyingEdits}
-                className="px-4 py-2 text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl transition-all disabled:opacity-50"
-              >
-                Continue without changes
-              </button>
-              <button
-                onClick={async () => {
-                  if (activeEdits.length > 0) {
-                    await handleApplyEdits(activeEdits, true);
-                  } else {
-                    setAppliedEdits([]);
-                    setImageUrl(originalImageUrl);
-                    setIsEditingText(false);
-                  }
-                }}
-                disabled={isApplyingEdits || ocrStatus === 'scanning'}
-                className="px-5 py-2 text-xs font-bold bg-gradient-to-r from-fuchsia-600 to-purple-600 hover:from-fuchsia-700 hover:to-purple-700 text-white rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center space-x-1.5 disabled:opacity-50"
-              >
-                {isApplyingEdits ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                    <span>Applying...</span>
-                  </>
-                ) : (
-                  <span>Apply</span>
-                )}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
