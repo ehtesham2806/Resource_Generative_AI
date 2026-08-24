@@ -1,5 +1,4 @@
-import { forwardRef, useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { forwardRef } from 'react';
 
 interface GuideMockupProps {
   imageUrl?: string;
@@ -21,6 +20,8 @@ interface GuideMockupProps {
   descriptionColor?: string;
   descriptionSize?: number;
   showDescription?: boolean;
+  activeTextSection?: 'heading' | 'description' | 'badge' | null;
+  onSelectSection?: (section: 'heading' | 'description') => void;
   onHeadingChange?: (val: string) => void;
   onHeadingColorChange?: (val: string) => void;
   onHeadingSizeChange?: (val: number) => void;
@@ -51,6 +52,8 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
     descriptionColor = '#64748b',
     descriptionSize = 14,
     showDescription = true,
+    activeTextSection,
+    onSelectSection,
     onHeadingChange,
     onHeadingColorChange,
     onHeadingSizeChange,
@@ -59,63 +62,12 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
     onDescriptionSizeChange,
     onShowDescriptionChange,
   }, ref) => {
-    const [activePopover, setActivePopover] = useState<'heading' | 'description' | null>(null);
-    const [popoverCoords, setPopoverCoords] = useState<{ top: number; left: number } | null>(null);
-    const popoverRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-          const target = event.target as HTMLElement;
-          if (target.closest('.clickable-trigger')) {
-            return;
-          }
-          setActivePopover(null);
-          setPopoverCoords(null);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
     const handleTriggerClick = (
       event: React.MouseEvent<HTMLElement>,
       section: 'heading' | 'description'
     ) => {
       event.stopPropagation();
-      if (activePopover === section) {
-        setActivePopover(null);
-        setPopoverCoords(null);
-        return;
-      }
-
-      const rect = event.currentTarget.getBoundingClientRect();
-      const isPortraitLayout = outputHeight > outputWidth;
-
-      let top = 0;
-      let left = 0;
-
-      if (isPortraitLayout) {
-        if (section === 'description') {
-          top = rect.top + window.scrollY - 100 - 8;
-        } else {
-          top = rect.bottom + window.scrollY + 8;
-        }
-        left = Math.max(8, rect.left + window.scrollX);
-      } else {
-        left = rect.right + window.scrollX + 16;
-        if (section === 'description') {
-          top = rect.bottom + window.scrollY - 80;
-        } else {
-          top = rect.top + window.scrollY;
-        }
-      }
-
-      setPopoverCoords({
-        top: top,
-        left: left,
-      });
-      setActivePopover(section);
+      onSelectSection?.(section);
     };
 
     const isPortrait = outputHeight > outputWidth;
@@ -255,7 +207,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                   {heading}
                 </h1>
 
-                {activePopover === 'heading' && (
+                {activeTextSection === 'heading' && (
                   <div className="absolute -inset-2 border-2 border-fuchsia-500 pointer-events-none rounded-lg mockup-popover-exclude z-20">
                     {/* Corner circles */}
                     <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full"></div>
@@ -287,7 +239,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                     className={`relative font-medium leading-relaxed break-words cursor-text rounded-lg p-1 transition-all select-text w-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none min-h-[1.5em] ${
                       isDescriptionEmpty ? 'is-empty' : ''
                     } ${
-                      activePopover === 'description'
+                      activeTextSection === 'description'
                         ? 'ring-0 outline-none'
                         : 'hover:ring-1 hover:ring-fuchsia-500/50'
                     }`}
@@ -299,7 +251,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                     {description}
                   </p>
 
-                  {activePopover === 'description' && (
+                  {activeTextSection === 'description' && (
                     <div className="absolute -inset-2 border-2 border-fuchsia-500 pointer-events-none rounded-lg mockup-popover-exclude z-20">
                       {/* Corner circles */}
                       <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full"></div>
@@ -317,104 +269,6 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
 
           </div>
         </div>
-
-        {/* Floating editing toolbars */}
-        {activePopover && popoverCoords && createPortal(
-          <div
-            ref={popoverRef}
-            className="absolute p-2 bg-[#0d0d1dfa] backdrop-blur-md border border-slate-700/80 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.6)] z-[9999] flex items-center gap-3 select-none mockup-popover-exclude font-sans text-xs text-white"
-            style={{
-              top: `${popoverCoords.top}px`,
-              left: `${popoverCoords.left}px`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {activePopover === 'heading' && (
-              <>
-                {/* Font Size decrease */}
-                <button
-                  onClick={() => onHeadingSizeChange?.(Math.max(10, headingSize - 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  -
-                </button>
-                <span className="text-xs font-bold text-slate-300 w-6 text-center select-none">{headingSize}</span>
-                {/* Font Size increase */}
-                <button
-                  onClick={() => onHeadingSizeChange?.(Math.min(72, headingSize + 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  +
-                </button>
-
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Color Button */}
-                <div className="flex items-center gap-1.5 relative">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase select-none">A</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input
-                      type="color"
-                      value={headingColor}
-                      onChange={(e) => onHeadingColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Description Toggle */}
-                <button
-                  onClick={() => onShowDescriptionChange?.(!showDescription)}
-                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
-                    showDescription
-                      ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30'
-                      : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
-                  }`}
-                >
-                  Description
-                </button>
-              </>
-            )}
-
-            {activePopover === 'description' && (
-              <>
-                {/* Font Size decrease */}
-                <button
-                  onClick={() => onDescriptionSizeChange?.(Math.max(10, descriptionSize - 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  -
-                </button>
-                <span className="text-xs font-bold text-slate-300 w-6 text-center select-none">{descriptionSize}</span>
-                {/* Font Size increase */}
-                <button
-                  onClick={() => onDescriptionSizeChange?.(Math.min(32, descriptionSize + 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  +
-                </button>
-
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Color Button */}
-                <div className="flex items-center gap-1.5 relative">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase select-none">A</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input
-                      type="color"
-                      value={descriptionColor}
-                      onChange={(e) => onDescriptionColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-          </div>,
-          document.body
-        )}
       </>
     );
   }

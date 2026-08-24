@@ -141,6 +141,7 @@ function App() {
   const [guideDescriptionColor, setGuideDescriptionColor] = useState<string>('#64748b');
   const [guideDescriptionSize, setGuideDescriptionSize] = useState<number>(14);
   const [guideShowDescription, setGuideShowDescription] = useState<boolean>(true);
+  const [activeTextSection, setActiveTextSection] = useState<'heading' | 'description' | 'badge' | null>(null);
 
   const [exportScale, setExportScale] = useState<number>(1);
   const [isScaleDropdownOpen, setIsScaleDropdownOpen] = useState<boolean>(false);
@@ -148,25 +149,38 @@ function App() {
 
   const bottomScaleDropdownRef = useRef<HTMLDivElement>(null);
   const headerScaleDropdownRef = useRef<HTMLDivElement>(null);
+  const modificationToolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
       if (
         bottomScaleDropdownRef.current &&
-        !bottomScaleDropdownRef.current.contains(event.target as Node)
+        !bottomScaleDropdownRef.current.contains(target)
       ) {
         setIsScaleDropdownOpen(false);
       }
       if (
         headerScaleDropdownRef.current &&
-        !headerScaleDropdownRef.current.contains(event.target as Node)
+        !headerScaleDropdownRef.current.contains(target)
       ) {
         setIsHeaderScaleDropdownOpen(false);
+      }
+      if (
+        modificationToolbarRef.current &&
+        !modificationToolbarRef.current.contains(target) &&
+        !target.closest('.clickable-trigger')
+      ) {
+        setActiveTextSection(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    setActiveTextSection(null);
+  }, [mockupTemplate]);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -1397,12 +1411,12 @@ function App() {
                 category: 'Webinar',
                 previewBg: 'bg-[#2554eb]',
                 preview: (
-                  <div className="w-full h-full relative flex flex-col items-center justify-center bg-gradient-to-br from-[#1d4ed8] via-[#2563eb] to-[#3b82f6] p-2">
-                    <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center text-white shadow-md mb-1">
-                      <Tv className="w-4 h-4" />
-                    </div>
-                    <div className="w-12 h-1 bg-white/70 rounded-full"></div>
-                    <span className="absolute top-1.5 left-2 px-1 py-0.5 bg-purple-600/90 text-[7px] text-white font-bold rounded">LIVE</span>
+                  <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="/templateThumbnails/webinar.png" 
+                      alt="Webinar" 
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ),
                 onClick: () => setMockupTemplate('webinar')
@@ -1413,11 +1427,11 @@ function App() {
                 category: 'Book',
                 previewBg: 'bg-[#f4f4f6] dark:bg-[#1a1a22]',
                 preview: (
-                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#f8f8fa] to-[#e8e8ed] dark:from-[#1b1b24] dark:to-[#12121a] p-1">
+                  <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
                     <img 
-                      src="/Book.png" 
+                      src="/templateThumbnails/book.png" 
                       alt="Book" 
-                      className="w-full h-full object-contain filter drop-shadow-md"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 ),
@@ -1429,11 +1443,11 @@ function App() {
                 category: 'App',
                 previewBg: 'bg-[#fafafa] dark:bg-[#161622]',
                 preview: (
-                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#fafafa] to-[#ededed] dark:from-[#1d1d2b] dark:to-[#11111d] p-1">
+                  <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
                     <img 
-                      src="/Laptop.png" 
+                      src="/templateThumbnails/laptop.png" 
                       alt="Laptop" 
-                      className="w-full h-full object-contain filter drop-shadow-md"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 ),
@@ -1445,11 +1459,11 @@ function App() {
                 category: 'Social Media',
                 previewBg: 'bg-pink-100 dark:bg-[#2c1020]',
                 preview: (
-                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#fbcfe8]/40 via-[#fda4af]/30 to-[#f472b6]/30 dark:from-[#3b1228] dark:to-[#220d1c] p-1">
+                  <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
                     <img 
-                      src="/Mobile.png" 
+                      src="/templateThumbnails/mobile.png" 
                       alt="Phone" 
-                      className="w-full h-full object-contain filter drop-shadow-md"
+                      className="w-full h-full object-cover"
                     />
                   </div>
                 ),
@@ -1461,16 +1475,12 @@ function App() {
                 category: 'App',
                 previewBg: 'bg-slate-100 dark:bg-[#12141f]',
                 preview: (
-                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#f1f5f9] to-[#cbd5e1] dark:from-[#1a1c29] dark:to-[#0f111a] p-1.5">
-                    <div className="w-12 h-14 bg-slate-900 rounded-lg border border-slate-700 shadow-md flex flex-col items-center justify-between p-1">
-                      <div className="w-full h-full bg-gradient-to-tr from-amber-500/20 via-rose-500/20 to-indigo-500/20 rounded flex items-center justify-center">
-                        <TabletIcon className="w-4 h-4 text-slate-400" />
-                      </div>
-                    </div>
-                    <div className="absolute top-2 right-2 w-2.5 h-4 flex flex-col items-center">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500/70 mb-0.5"></div>
-                      <div className="w-1.5 h-1.5 bg-amber-700/50 rounded-xs"></div>
-                    </div>
+                  <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="/templateThumbnails/tablet.png" 
+                      alt="Tablet" 
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ),
                 onClick: () => setMockupTemplate('tablet')
@@ -1481,15 +1491,12 @@ function App() {
                 category: 'Book',
                 previewBg: 'bg-amber-50 dark:bg-[#1a1510]',
                 preview: (
-                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#fef3c7]/60 to-[#fde68a]/40 dark:from-[#2e2316] dark:to-[#17120a] p-1.5">
-                    <div className="w-16 h-11 bg-white dark:bg-slate-100 rounded shadow-sm border border-amber-200/60 flex flex-col justify-between p-1 text-slate-800">
-                      <div className="w-3/4 h-1 bg-slate-800 rounded"></div>
-                      <div className="w-full h-0.5 bg-slate-300 rounded"></div>
-                      <div className="w-1/2 h-0.5 bg-slate-300 rounded"></div>
-                    </div>
-                    <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-stone-700 flex items-center justify-center">
-                      <div className="w-1.5 h-1.5 rounded-full bg-amber-900"></div>
-                    </div>
+                  <div className="w-full h-full relative flex items-center justify-center overflow-hidden">
+                    <img 
+                      src="/templateThumbnails/guide.png" 
+                      alt="Guide" 
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ),
                 onClick: () => setMockupTemplate('guide')
@@ -1556,7 +1563,7 @@ function App() {
                         }`}
                       >
                         {/* Thumbnail container */}
-                        <div className="relative aspect-[16/10] w-full rounded-xl overflow-hidden mb-2 border border-slate-200/60 dark:border-[#222240] shadow-sm">
+                        <div className="relative aspect-[16/10] w-full rounded-xl overflow-hidden mb-2 shadow-sm">
                           {item.preview}
 
                           {/* Selected checkmark badge */}
@@ -2051,46 +2058,282 @@ function App() {
 
           <div className="w-full max-w-5xl relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
               
-              {/* Top Canvas Badges */}
-              <div className="absolute top-5 left-6 z-10 flex items-center space-x-2">
-                <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-colors duration-300">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  <span>{outputWidth} × {outputHeight}</span>
+              {/* Top Canvas Header Controls */}
+              <div className="absolute top-4 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
+                {/* Left Badges */}
+                <div className="flex items-center space-x-2 pointer-events-auto">
+                  <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full flex items-center space-x-1.5 transition-colors duration-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>{outputWidth} × {outputHeight}</span>
+                  </div>
+                  <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full transition-colors duration-300">
+                    100%
+                  </div>
                 </div>
-                <div className="bg-white/80 dark:bg-[#080814]/80 backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] text-[10px] text-slate-600 dark:text-slate-300 font-semibold px-3 py-1.5 rounded-full transition-colors duration-300">
-                  100%
-                </div>
-              </div>
 
-              <div className="absolute top-5 right-6 z-10 flex items-center">
-                {imageUrl && (
-                  <button
-                    onClick={openTextEditor}
-                    className="bg-white/80 dark:bg-[#080814]/80 hover:bg-indigo-50 dark:hover:bg-[#151532] backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] hover:border-indigo-300 dark:hover:border-[#2b2b54] text-brand dark:text-indigo-300 font-semibold text-[11px] px-3.5 py-1.5 rounded-full shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5"
-                    title={isPdfDoc && hasNativePdfText ? "Edit Native PDF Page 1 Text" : "Edit or Remove Image Text Content via OCR"}
-                  >
-                    {isPdfDoc && hasNativePdfText ? (
-                      <>
-                        <FileText className="w-3.5 h-3.5 text-brand" />
-                        <span>Edit PDF Text</span>
-                      </>
-                    ) : ocrStatus === 'scanning' ? (
-                      <>
-                        <span className="relative flex h-2 w-2 mr-0.5">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
-                        </span>
-                        <span>Edit Image Text</span>
-                        <span className="text-[10px] text-brand/80 dark:text-indigo-400 font-medium ml-0.5 animate-pulse">Scanning...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-3.5 h-3.5" />
-                        <span>Edit Image Text</span>
-                      </>
-                    )}
-                  </button>
-                )}
+                {/* Right: Modification Toolbar + Edit PDF Text */}
+                <div className="flex items-center space-x-2.5 pointer-events-auto">
+                  {/* Modification Toolbar for Webinar and Guide Mockups - Shown only when an element is clicked */}
+                  {(mockupTemplate === 'webinar' || mockupTemplate === 'guide') && activeTextSection && (
+                    <div 
+                      ref={modificationToolbarRef}
+                      className="bg-[#0e0e1e]/90 dark:bg-[#0c0c1c]/95 backdrop-blur-md border border-slate-700/80 rounded-full px-3 py-1 shadow-lg flex items-center gap-2.5 text-xs text-white"
+                    >
+                      {/* Heading Controls */}
+                      {activeTextSection === 'heading' && (
+                        <>
+                          <button
+                            onClick={() => {
+                              if (mockupTemplate === 'webinar') {
+                                setWebinarHeadingSize(Math.max(10, webinarHeadingSize - 1));
+                              } else {
+                                setGuideHeadingSize(Math.max(10, guideHeadingSize - 1));
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-white font-bold text-xs cursor-pointer select-none transition-colors"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold text-slate-200 w-5 text-center select-none">
+                            {mockupTemplate === 'webinar' ? webinarHeadingSize : guideHeadingSize}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (mockupTemplate === 'webinar') {
+                                setWebinarHeadingSize(Math.min(72, webinarHeadingSize + 1));
+                              } else {
+                                setGuideHeadingSize(Math.min(72, guideHeadingSize + 1));
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-white font-bold text-xs cursor-pointer select-none transition-colors"
+                          >
+                            +
+                          </button>
+
+                          <div className="w-[1px] h-4 bg-slate-700/80"></div>
+
+                          <div className="flex items-center gap-1.5 relative">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase select-none">A</span>
+                            <div className="relative w-5 h-5 rounded border border-slate-600 overflow-hidden cursor-pointer flex-shrink-0">
+                              <input
+                                type="color"
+                                value={mockupTemplate === 'webinar' ? webinarHeadingColor : guideHeadingColor}
+                                onChange={(e) => {
+                                  if (mockupTemplate === 'webinar') {
+                                    setWebinarHeadingColor(e.target.value);
+                                  } else {
+                                    setGuideHeadingColor(e.target.value);
+                                  }
+                                }}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="w-[1px] h-4 bg-slate-700/80"></div>
+
+                          {mockupTemplate === 'webinar' && (
+                            <button
+                              onClick={() => setWebinarShowBadge(!webinarShowBadge)}
+                              className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
+                                webinarShowBadge
+                                  ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30'
+                                  : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
+                              }`}
+                            >
+                              Badge
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => {
+                              if (mockupTemplate === 'webinar') {
+                                setWebinarShowDescription(!webinarShowDescription);
+                              } else {
+                                setGuideShowDescription(!guideShowDescription);
+                              }
+                            }}
+                            className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
+                              (mockupTemplate === 'webinar' ? webinarShowDescription : guideShowDescription)
+                                ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30'
+                                : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
+                            }`}
+                          >
+                            Description
+                          </button>
+                        </>
+                      )}
+
+                      {/* Description Controls */}
+                      {activeTextSection === 'description' && (
+                        <>
+                          <button
+                            onClick={() => {
+                              if (mockupTemplate === 'webinar') {
+                                setWebinarDescriptionSize(Math.max(10, webinarDescriptionSize - 1));
+                              } else {
+                                setGuideDescriptionSize(Math.max(10, guideDescriptionSize - 1));
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-white font-bold text-xs cursor-pointer select-none transition-colors"
+                          >
+                            -
+                          </button>
+                          <span className="text-xs font-bold text-slate-200 w-5 text-center select-none">
+                            {mockupTemplate === 'webinar' ? webinarDescriptionSize : guideDescriptionSize}
+                          </span>
+                          <button
+                            onClick={() => {
+                              if (mockupTemplate === 'webinar') {
+                                setWebinarDescriptionSize(Math.min(32, webinarDescriptionSize + 1));
+                              } else {
+                                setGuideDescriptionSize(Math.min(32, guideDescriptionSize + 1));
+                              }
+                            }}
+                            className="w-6 h-6 flex items-center justify-center rounded-md bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-white font-bold text-xs cursor-pointer select-none transition-colors"
+                          >
+                            +
+                          </button>
+
+                          <div className="w-[1px] h-4 bg-slate-700/80"></div>
+
+                          <div className="flex items-center gap-1.5 relative">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase select-none">A</span>
+                            <div className="relative w-5 h-5 rounded border border-slate-600 overflow-hidden cursor-pointer flex-shrink-0">
+                              <input
+                                type="color"
+                                value={mockupTemplate === 'webinar' ? webinarDescriptionColor : guideDescriptionColor}
+                                onChange={(e) => {
+                                  if (mockupTemplate === 'webinar') {
+                                    setWebinarDescriptionColor(e.target.value);
+                                  } else {
+                                    setGuideDescriptionColor(e.target.value);
+                                  }
+                                }}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="w-[1px] h-4 bg-slate-700/80"></div>
+
+                          <button
+                            onClick={() => {
+                              if (mockupTemplate === 'webinar') {
+                                setWebinarShowDescription(!webinarShowDescription);
+                              } else {
+                                setGuideShowDescription(!guideShowDescription);
+                              }
+                            }}
+                            className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
+                              (mockupTemplate === 'webinar' ? webinarShowDescription : guideShowDescription)
+                                ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30'
+                                : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
+                            }`}
+                          >
+                            Description
+                          </button>
+                        </>
+                      )}
+
+                      {/* Badge Controls */}
+                      {activeTextSection === 'badge' && mockupTemplate === 'webinar' && (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase select-none">Txt</span>
+                            <div className="relative w-5 h-5 rounded border border-slate-600 overflow-hidden cursor-pointer flex-shrink-0">
+                              <input
+                                type="color"
+                                value={webinarBadgeTextColor}
+                                onChange={(e) => setWebinarBadgeTextColor(e.target.value)}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase select-none">Bg</span>
+                            <div className="relative w-5 h-5 rounded border border-slate-600 overflow-hidden cursor-pointer flex-shrink-0">
+                              <input
+                                type="color"
+                                value={webinarBadgeBgColor}
+                                onChange={(e) => setWebinarBadgeBgColor(e.target.value)}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase select-none">Brd</span>
+                            <div className="relative w-5 h-5 rounded border border-slate-600 overflow-hidden cursor-pointer flex-shrink-0">
+                              <input
+                                type="color"
+                                value={webinarBadgeBorderColor}
+                                onChange={(e) => setWebinarBadgeBorderColor(e.target.value)}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <span className="text-[9px] font-bold text-slate-400 uppercase select-none">Dot</span>
+                            <div className="relative w-5 h-5 rounded border border-slate-600 overflow-hidden cursor-pointer flex-shrink-0">
+                              <input
+                                type="color"
+                                value={webinarBadgeDotColor}
+                                onChange={(e) => setWebinarBadgeDotColor(e.target.value)}
+                                className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="w-[1px] h-4 bg-slate-700/80"></div>
+
+                          <button
+                            onClick={() => setWebinarShowBadge(!webinarShowBadge)}
+                            className={`px-2.5 py-0.5 rounded-full border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
+                              webinarShowBadge
+                                ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30'
+                                : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
+                            }`}
+                          >
+                            Badge
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Edit PDF Text / Image Text Button */}
+                  {imageUrl && (
+                    <button
+                      onClick={openTextEditor}
+                      className="bg-white/80 dark:bg-[#080814]/80 hover:bg-indigo-50 dark:hover:bg-[#151532] backdrop-blur-md border border-slate-200/60 dark:border-[#1c1c38] hover:border-indigo-300 dark:hover:border-[#2b2b54] text-brand dark:text-indigo-300 font-semibold text-[11px] px-3.5 py-1.5 rounded-full shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center space-x-1.5"
+                      title={isPdfDoc && hasNativePdfText ? "Edit Native PDF Page 1 Text" : "Edit or Remove Image Text Content via OCR"}
+                    >
+                      {isPdfDoc && hasNativePdfText ? (
+                        <>
+                          <FileText className="w-3.5 h-3.5 text-brand" />
+                          <span>Edit PDF Text</span>
+                        </>
+                      ) : ocrStatus === 'scanning' ? (
+                        <>
+                          <span className="relative flex h-2 w-2 mr-0.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-brand"></span>
+                          </span>
+                          <span>Edit Image Text</span>
+                          <span className="text-[10px] text-brand/80 dark:text-indigo-400 font-medium ml-0.5 animate-pulse">Scanning...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3.5 h-3.5" />
+                          <span>Edit Image Text</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Centered device container */}
@@ -2207,6 +2450,8 @@ function App() {
                     badgeBorderColor={webinarBadgeBorderColor}
                     badgeTextColor={webinarBadgeTextColor}
                     badgeDotColor={webinarBadgeDotColor}
+                    activeTextSection={activeTextSection}
+                    onSelectSection={setActiveTextSection}
                     onHeadingChange={setWebinarHeading}
                     onHeadingColorChange={setWebinarHeadingColor}
                     onHeadingSizeChange={setWebinarHeadingSize}
@@ -2244,6 +2489,8 @@ function App() {
                     descriptionColor={guideDescriptionColor}
                     descriptionSize={guideDescriptionSize}
                     showDescription={guideShowDescription}
+                    activeTextSection={activeTextSection}
+                    onSelectSection={(section) => setActiveTextSection(section as 'heading' | 'description')}
                     onHeadingChange={setGuideHeading}
                     onHeadingColorChange={setGuideHeadingColor}
                     onHeadingSizeChange={setGuideHeadingSize}

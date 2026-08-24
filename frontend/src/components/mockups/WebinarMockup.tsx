@@ -1,5 +1,4 @@
-import { forwardRef, useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import { forwardRef } from 'react';
 
 interface WebinarMockupProps {
   imageUrl?: string;
@@ -26,6 +25,8 @@ interface WebinarMockupProps {
   badgeBorderColor?: string;
   badgeTextColor?: string;
   badgeDotColor?: string;
+  activeTextSection?: 'heading' | 'description' | 'badge' | null;
+  onSelectSection?: (section: 'heading' | 'description' | 'badge') => void;
   onHeadingChange?: (val: string) => void;
   onHeadingColorChange?: (val: string) => void;
   onHeadingSizeChange?: (val: number) => void;
@@ -68,6 +69,8 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
     badgeBorderColor = '#3b1547',
     badgeTextColor = '#d946ef',
     badgeDotColor = '#d946ef',
+    activeTextSection,
+    onSelectSection,
     onHeadingChange,
     onHeadingColorChange,
     onHeadingSizeChange,
@@ -83,64 +86,12 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
     showDescription = true,
     onShowDescriptionChange,
   }, ref) => {
-    const [activePopover, setActivePopover] = useState<'badge' | 'heading' | 'description' | null>(null);
-    const [popoverCoords, setPopoverCoords] = useState<{ top: number; left: number } | null>(null);
-    const popoverRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-      const handleClickOutside = (event: MouseEvent) => {
-        if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-          const target = event.target as HTMLElement;
-          if (target.closest('.clickable-trigger')) {
-            return;
-          }
-          setActivePopover(null);
-          setPopoverCoords(null);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
     const handleTriggerClick = (
       event: React.MouseEvent<HTMLElement>,
       section: 'badge' | 'heading' | 'description'
     ) => {
       event.stopPropagation();
-      if (activePopover === section) {
-        setActivePopover(null);
-        setPopoverCoords(null);
-        return;
-      }
-
-      const rect = event.currentTarget.getBoundingClientRect();
-      const isPortraitLayout = outputHeight > outputWidth;
-      
-      let top = 0;
-      let left = 0;
-
-      if (isPortraitLayout) {
-        if (section === 'description') {
-          top = rect.top + window.scrollY - 100 - 8;
-        } else {
-          top = rect.bottom + window.scrollY + 8;
-        }
-        left = Math.max(8, rect.left + window.scrollX);
-      } else {
-        // Landscape layout: place popover on the right side of the content
-        left = rect.right + window.scrollX + 16;
-        if (section === 'description') {
-          top = rect.bottom + window.scrollY - 80;
-        } else {
-          top = rect.top + window.scrollY;
-        }
-      }
-
-      setPopoverCoords({
-        top: top,
-        left: left,
-      });
-      setActivePopover(section);
+      onSelectSection?.(section);
     };
 
     const isPortrait = outputHeight > outputWidth;
@@ -183,7 +134,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                   <div 
                     onClick={(e) => handleTriggerClick(e, 'badge')}
                     className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-[10px] font-bold tracking-widest uppercase border cursor-pointer transition-all select-none relative ${
-                      activePopover === 'badge'
+                      activeTextSection === 'badge'
                         ? 'ring-0 outline-none border-fuchsia-500'
                         : 'hover:ring-1 hover:ring-fuchsia-500/50'
                     }`}
@@ -214,7 +165,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                     </span>
                   </div>
 
-                  {activePopover === 'badge' && (
+                  {activeTextSection === 'badge' && (
                     <div className="absolute -inset-1 border-2 border-fuchsia-500 pointer-events-none rounded-full mockup-popover-exclude z-20">
                       {/* Left/Right middle handles */}
                       <div className="absolute top-1/2 -left-1 -translate-y-1/2 w-1.5 h-2.5 bg-white border border-fuchsia-500 rounded-full"></div>
@@ -241,7 +192,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                   className={`relative font-extrabold tracking-tight mb-0 font-['Outfit'] leading-tight break-words cursor-text rounded-lg p-1 transition-all select-text w-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none min-h-[1.5em] ${
                     isHeadingEmpty ? 'is-empty' : ''
                   } ${
-                    activePopover === 'heading'
+                    activeTextSection === 'heading'
                       ? 'ring-0 outline-none'
                       : 'hover:ring-1 hover:ring-fuchsia-500/50'
                   }`}
@@ -253,7 +204,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                   {heading}
                 </h1>
 
-                {activePopover === 'heading' && (
+                {activeTextSection === 'heading' && (
                   <div className="absolute -inset-2 border-2 border-fuchsia-500 pointer-events-none rounded-lg mockup-popover-exclude z-20">
                     {/* Corner circles */}
                     <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full"></div>
@@ -285,7 +236,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                     className={`relative font-medium leading-relaxed break-words cursor-text rounded-lg p-1 transition-all select-text w-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none min-h-[1.5em] ${
                       isDescriptionEmpty ? 'is-empty' : ''
                     } ${
-                      activePopover === 'description'
+                      activeTextSection === 'description'
                         ? 'ring-0 outline-none'
                         : 'hover:ring-1 hover:ring-fuchsia-500/50'
                     }`}
@@ -297,7 +248,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                     {description}
                   </p>
 
-                  {activePopover === 'description' && (
+                  {activeTextSection === 'description' && (
                     <div className="absolute -inset-2 border-2 border-fuchsia-500 pointer-events-none rounded-lg mockup-popover-exclude z-20">
                       {/* Corner circles */}
                       <div className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full"></div>
@@ -374,188 +325,6 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
 
           </div>
         </div>
-
-        {/* Floating Canva-style compact editing toolbars */}
-        {activePopover && popoverCoords && createPortal(
-          <div 
-            ref={popoverRef}
-            className="absolute p-2 bg-[#0d0d1dfa] backdrop-blur-md border border-slate-700/80 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.6)] z-[9999] flex items-center gap-3 select-none mockup-popover-exclude font-sans text-xs text-white"
-            style={{
-              top: `${popoverCoords.top}px`,
-              left: `${popoverCoords.left}px`,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {activePopover === 'heading' && (
-              <>
-                {/* Font Size decrease button */}
-                <button 
-                  onClick={() => onHeadingSizeChange?.(Math.max(10, headingSize - 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  -
-                </button>
-                {/* Font Size Display */}
-                <span className="text-xs font-bold text-slate-300 w-6 text-center select-none">{headingSize}</span>
-                {/* Font Size increase button */}
-                <button 
-                  onClick={() => onHeadingSizeChange?.(Math.min(72, headingSize + 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  +
-                </button>
-
-                {/* Divider */}
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Color Button with active underline */}
-                <div className="flex items-center gap-1.5 relative">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase select-none">A</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input 
-                      type="color"
-                      value={headingColor}
-                      onChange={(e) => onHeadingColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Live Badge Toggle Icon Button */}
-                <button
-                  onClick={() => onShowBadgeChange?.(!showBadge)}
-                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
-                    showBadge 
-                      ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30' 
-                      : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
-                  }`}
-                >
-                  Badge
-                </button>
-
-                {/* Description Toggle Icon Button */}
-                <button
-                  onClick={() => onShowDescriptionChange?.(!showDescription)}
-                  className={`px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase transition-all cursor-pointer select-none ${
-                    showDescription 
-                      ? 'bg-fuchsia-500/20 border-fuchsia-500 text-fuchsia-300 hover:bg-fuchsia-500/30' 
-                      : 'bg-slate-800/60 border-slate-700/50 text-slate-400 hover:bg-slate-700/80 hover:text-white'
-                  }`}
-                >
-                  Description
-                </button>
-              </>
-            )}
-
-            {activePopover === 'description' && (
-              <>
-                {/* Font Size decrease button */}
-                <button 
-                  onClick={() => onDescriptionSizeChange?.(Math.max(10, descriptionSize - 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  -
-                </button>
-                {/* Font Size Display */}
-                <span className="text-xs font-bold text-slate-300 w-6 text-center select-none">{descriptionSize}</span>
-                {/* Font Size increase button */}
-                <button 
-                  onClick={() => onDescriptionSizeChange?.(Math.min(32, descriptionSize + 1))}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700/50 text-white font-bold text-sm cursor-pointer select-none transition-colors"
-                >
-                  +
-                </button>
-
-                {/* Divider */}
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Color Button */}
-                <div className="flex items-center gap-1.5 relative">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase select-none">A</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input 
-                      type="color"
-                      value={descriptionColor}
-                      onChange={(e) => onDescriptionColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activePopover === 'badge' && (
-              <>
-                {/* Text Color option */}
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase select-none">Txt</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input 
-                      type="color"
-                      value={badgeTextColor}
-                      onChange={(e) => onBadgeTextColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Bg Color option */}
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase select-none">Bg</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input 
-                      type="color"
-                      value={badgeBgColor}
-                      onChange={(e) => onBadgeBgColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Border Color option */}
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase select-none">Brd</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input 
-                      type="color"
-                      value={badgeBorderColor}
-                      onChange={(e) => onBadgeBorderColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Dot Color option */}
-                <div className="flex items-center gap-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase select-none">Dot</span>
-                  <div className="relative w-6 h-6 rounded-md border border-slate-700 overflow-hidden cursor-pointer flex-shrink-0">
-                    <input 
-                      type="color"
-                      value={badgeDotColor}
-                      onChange={(e) => onBadgeDotColorChange?.(e.target.value)}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-[1px] h-5 bg-slate-800"></div>
-
-                {/* Remove Badge Button */}
-                <button
-                  onClick={() => { onShowBadgeChange?.(false); setActivePopover(null); setPopoverCoords(null); }}
-                  className="px-2 py-1 rounded-lg border border-rose-500/30 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[10px] font-bold uppercase transition-all cursor-pointer select-none"
-                >
-                  Remove
-                </button>
-              </>
-            )}
-          </div>,
-          document.body
-        )}
       </>
     );
   }
