@@ -29,6 +29,12 @@ import {
   Pencil,
   Trash2,
   X,
+  Upload,
+  LayoutGrid,
+  Square,
+  SlidersHorizontal,
+  Search,
+  Filter,
 } from 'lucide-react';
 import LaptopMockup from './components/mockups/LaptopMockup.tsx';
 import BookMockup from './components/mockups/BookMockup.tsx';
@@ -87,6 +93,9 @@ function App() {
   const [error, setError] = useState<string>('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'upload' | 'template' | 'canvas' | 'adjust'>('template');
+  const [templateSearch, setTemplateSearch] = useState<string>('');
+  const [templateCategory, setTemplateCategory] = useState<string>('All');
   
   const defaultMockupRef = useRef<HTMLDivElement>(null);
   const laptopMockupRef = useRef<HTMLDivElement>(null);
@@ -1061,7 +1070,7 @@ function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-[#07070c] dark:text-[#e2e8f0] flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-300">
+    <div className="h-screen w-screen overflow-hidden bg-slate-50 text-slate-800 dark:bg-[#07070c] dark:text-[#e2e8f0] flex flex-col font-['Plus_Jakarta_Sans',sans-serif] transition-colors duration-300">
       {/* Top Banner Alert when Backend Offline */}
       {backendStatus !== 'online' && (
         <div
@@ -1184,127 +1193,100 @@ function App() {
         </div>
       </header>
 
-      {/* Main Layout Area */}
-      <main className="flex-1 max-w-[1600px] mx-auto w-full px-6 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
-          {/* Left Column (Templates, Source Uploader, Capabilities) */}
-          <div className="lg:col-span-3 flex flex-col gap-6">
-            
-            {/* 1. Templates selector card */}
-            <div className="premium-card rounded-2xl p-4">
-              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest mb-3 flex items-center">
-                <Monitor className="w-3 h-3 mr-1.5 text-brand" />
-                Templates
-              </h3>
-              
-              <div className="grid grid-cols-2 gap-2">
-                {/* Default Template Tile */}
-                <button
-                  onClick={() => {
-                    setMockupTemplate('default');
-                    setObjectFit('contain');
-                    setCoverPosition('0px');
-                    setCoverLeft('0px');
-                    setCoverScale(1.0);
-                  }}
-                  className={`col-span-1 flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'default'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <ImageIcon className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'default' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Default</span>
-                </button>
+      {/* Main Layout Area: Left Sidebar Rail + Active Drawer + Live Preview Canvas */}
+      <main className="flex-1 flex w-full overflow-hidden min-h-0">
+        {/* 1. Left Vertical Navigation Rail (Upload -> Template -> Canvas -> Adjust -> Help) */}
+        <aside className="w-[74px] flex-shrink-0 h-full bg-white/70 dark:bg-[#070712] border-r border-slate-200/80 dark:border-[#1c1c38] flex flex-col items-center justify-between py-5 transition-colors duration-300 z-20 overflow-y-auto">
+          <div className="flex flex-col items-center space-y-3 w-full px-2">
+            {/* Upload Tab */}
+            <button
+              onClick={() => setActiveSidebarTab('upload')}
+              className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
+                activeSidebarTab === 'upload'
+                  ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121226]'
+              }`}
+              title="Upload Source File"
+            >
+              <Upload className="w-5 h-5 mb-1" />
+              <span className="text-[10px] font-medium tracking-tight">Upload</span>
+            </button>
 
-                {/* Webinar Tile */}
-                <button
-                  onClick={() => setMockupTemplate('webinar')}
-                  className={`col-span-1 flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'webinar'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Tv className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'webinar' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Webinar</span>
-                </button>
+            {/* Template Tab */}
+            <button
+              onClick={() => setActiveSidebarTab('template')}
+              className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
+                activeSidebarTab === 'template'
+                  ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121226]'
+              }`}
+              title="Templates"
+            >
+              <LayoutGrid className="w-5 h-5 mb-1" />
+              <span className="text-[10px] font-medium tracking-tight">Template</span>
+            </button>
 
-                {/* Book Tile */}
-                <button
-                  onClick={() => setMockupTemplate('book')}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'book'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <BookOpen className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'book' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Book</span>
-                </button>
+            {/* Canvas Tab */}
+            <button
+              onClick={() => setActiveSidebarTab('canvas')}
+              className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
+                activeSidebarTab === 'canvas'
+                  ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121226]'
+              }`}
+              title="Canvas Settings"
+            >
+              <Square className="w-5 h-5 mb-1" />
+              <span className="text-[10px] font-medium tracking-tight">Canvas</span>
+            </button>
 
-                {/* Laptop Tile */}
-                <button
-                  onClick={() => setMockupTemplate('laptop')}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'laptop'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Laptop className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'laptop' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Laptop</span>
-                </button>
+            {/* Adjust Tab */}
+            <button
+              onClick={() => setActiveSidebarTab('adjust')}
+              className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
+                activeSidebarTab === 'adjust'
+                  ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121226]'
+              }`}
+              title="Transform & Adjust"
+            >
+              <SlidersHorizontal className="w-5 h-5 mb-1" />
+              <span className="text-[10px] font-medium tracking-tight">Adjust</span>
+            </button>
+          </div>
 
-                {/* Phone Tile */}
-                <button
-                  onClick={() => setMockupTemplate('phone')}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'phone'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Smartphone className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'phone' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Phone</span>
-                </button>
+          {/* Bottom Help Button */}
+          <div className="w-full px-2">
+            <button
+              onClick={() => setActiveSidebarTab('upload')}
+              className="w-full flex flex-col items-center justify-center py-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121226] rounded-2xl transition-all"
+              title="Help & Shortcuts"
+            >
+              <HelpCircle className="w-4 h-4 mb-0.5" />
+              <span className="text-[9px] font-medium">Help</span>
+            </button>
+          </div>
+        </aside>
 
-                {/* Tablet Tile */}
-                <button
-                  onClick={() => setMockupTemplate('tablet')}
-                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'tablet'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <TabletIcon className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'tablet' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Tablet</span>
-                </button>
+        {/* 2. Active Tab Drawer Panel (~340px width) */}
+        <aside className="w-[340px] flex-shrink-0 h-full bg-white/40 dark:bg-[#090918]/90 backdrop-blur-md border-r border-slate-200/80 dark:border-[#1c1c38] p-5 overflow-y-auto transition-all duration-300 flex flex-col gap-5">
+          {/* Active Tab Header */}
+          <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-[#1a1a32]">
+            <h3 className="text-sm font-bold text-slate-800 dark:text-white capitalize flex items-center font-['Outfit']">
+              {activeSidebarTab === 'upload' && <Upload className="w-4 h-4 mr-2 text-brand" />}
+              {activeSidebarTab === 'template' && <LayoutGrid className="w-4 h-4 mr-2 text-brand" />}
+              {activeSidebarTab === 'canvas' && <Square className="w-4 h-4 mr-2 text-brand" />}
+              {activeSidebarTab === 'adjust' && <SlidersHorizontal className="w-4 h-4 mr-2 text-brand" />}
+              {activeSidebarTab === 'upload' && 'Upload File'}
+              {activeSidebarTab === 'template' && 'Templates'}
+              {activeSidebarTab === 'canvas' && 'Canvas Settings'}
+              {activeSidebarTab === 'adjust' && 'Transform & Adjust'}
+            </h3>
+          </div>
 
-                {/* Guide Tile */}
-                <button
-                  onClick={() => setMockupTemplate('guide')}
-                  className={`col-span-1 flex flex-col items-center justify-center py-2.5 rounded-xl border transition-all ${
-                    mockupTemplate === 'guide'
-                      ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 border-transparent text-white shadow-[0_4px_16px_rgba(168,85,247,0.25)] font-semibold'
-                      : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-[#2b2b54] hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <FileText className={`w-4 h-4 mb-1 transition-colors ${mockupTemplate === 'guide' ? 'text-white' : 'text-brand'}`} />
-                  <span className="text-[10px]">Guide</span>
-                </button>
-              </div>
-            </div>
-
-            {/* 2. Source file card */}
-            <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
-                <Download className="w-3.5 h-3.5 mr-1.5 text-brand transform rotate-180" />
-                Source File
-              </h3>
-
+          {/* TAB 1: UPLOAD */}
+          {activeSidebarTab === 'upload' && (
+            <div className="flex flex-col gap-5">
               {/* Uploader Box */}
               <FileUpload 
                 onFileSelect={handleFileSelect} 
@@ -1353,93 +1335,721 @@ function App() {
                   <p className="text-[11px] text-red-200 leading-normal">{error}</p>
                 </div>
               )}
-            </div>
 
-            {/* 3. Capabilities Checklist card */}
-            <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
-                <Zap className="w-3 h-3 mr-1.5 text-brand" />
-                Capabilities
-              </h3>
-
-              <div className="flex flex-col gap-3">
-                {/* Image optimization */}
-                <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2.5 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
-                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-brand">
-                    <ImageIcon className="w-3.5 h-3.5" />
+              {/* Capabilities checklist card */}
+              <div className="premium-card rounded-2xl p-4 flex flex-col gap-3">
+                <h4 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
+                  <Zap className="w-3 h-3 mr-1.5 text-brand" />
+                  Capabilities
+                </h4>
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
+                    <div className="p-1 bg-indigo-500/10 rounded-lg text-brand">
+                      <ImageIcon className="w-3.5 h-3.5" />
+                    </div>
+                    <span>Image optimization</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Image optimization</span>
-                </div>
-
-                {/* PDF first-page extract */}
-                <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2.5 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
-                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-brand">
-                    <FileText className="w-3.5 h-3.5" />
+                  <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
+                    <div className="p-1 bg-indigo-500/10 rounded-lg text-brand">
+                      <FileText className="w-3.5 h-3.5" />
+                    </div>
+                    <span>PDF first-page extract</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">PDF first-page extract</span>
-                </div>
-
-                {/* Live preview engine */}
-                <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2.5 rounded-xl transition-all duration-300 hover:bg-white/80 dark:hover:bg-[#181836]/30 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_4px_12px_rgba(0,0,0,0.02)]">
-                  <div className="p-1.5 bg-indigo-500/10 rounded-lg text-brand">
-                    <Tv className="w-3.5 h-3.5" />
+                  <div className="flex items-center space-x-3 bg-white/40 dark:bg-[#0c0c1c]/60 border border-slate-200/50 dark:border-[#171732] px-3 py-2 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300">
+                    <div className="p-1 bg-indigo-500/10 rounded-lg text-brand">
+                      <Tv className="w-3.5 h-3.5" />
+                    </div>
+                    <span>Live preview engine</span>
                   </div>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Live preview engine</span>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 2: TEMPLATES (Visual Cards with Search & Category Tabs, No size text) */}
+          {activeSidebarTab === 'template' && (() => {
+            const templates = [
+              {
+                id: 'default',
+                name: 'Default',
+                category: 'All',
+                previewBg: 'bg-gradient-to-br from-[#f8d7b8] to-[#e6b994] dark:from-[#2a1d15] dark:to-[#17120e]',
+                preview: (
+                  <div className="w-full h-full relative flex items-center justify-center p-0.5 bg-[#0a1128] dark:bg-[#070c1e] overflow-hidden rounded-xl">
+                    <img 
+                      src="/default-mockup.jpg" 
+                      alt="Default" 
+                      className="w-full h-full object-cover rounded-lg shadow-sm"
+                    />
+                  </div>
+                ),
+                onClick: () => {
+                  setMockupTemplate('default');
+                  setObjectFit('contain');
+                  setCoverPosition('0px');
+                  setCoverLeft('0px');
+                  setCoverScale(1.0);
+                }
+              },
+              {
+                id: 'webinar',
+                name: 'Webinar',
+                category: 'Webinar',
+                previewBg: 'bg-[#2554eb]',
+                preview: (
+                  <div className="w-full h-full relative flex flex-col items-center justify-center bg-gradient-to-br from-[#1d4ed8] via-[#2563eb] to-[#3b82f6] p-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-500 flex items-center justify-center text-white shadow-md mb-1">
+                      <Tv className="w-4 h-4" />
+                    </div>
+                    <div className="w-12 h-1 bg-white/70 rounded-full"></div>
+                    <span className="absolute top-1.5 left-2 px-1 py-0.5 bg-purple-600/90 text-[7px] text-white font-bold rounded">LIVE</span>
+                  </div>
+                ),
+                onClick: () => setMockupTemplate('webinar')
+              },
+              {
+                id: 'book',
+                name: 'Book',
+                category: 'Book',
+                previewBg: 'bg-[#f4f4f6] dark:bg-[#1a1a22]',
+                preview: (
+                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#f8f8fa] to-[#e8e8ed] dark:from-[#1b1b24] dark:to-[#12121a] p-1">
+                    <img 
+                      src="/Book.png" 
+                      alt="Book" 
+                      className="w-full h-full object-contain filter drop-shadow-md"
+                    />
+                  </div>
+                ),
+                onClick: () => setMockupTemplate('book')
+              },
+              {
+                id: 'laptop',
+                name: 'Laptop',
+                category: 'App',
+                previewBg: 'bg-[#fafafa] dark:bg-[#161622]',
+                preview: (
+                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#fafafa] to-[#ededed] dark:from-[#1d1d2b] dark:to-[#11111d] p-1">
+                    <img 
+                      src="/Laptop.png" 
+                      alt="Laptop" 
+                      className="w-full h-full object-contain filter drop-shadow-md"
+                    />
+                  </div>
+                ),
+                onClick: () => setMockupTemplate('laptop')
+              },
+              {
+                id: 'phone',
+                name: 'Phone',
+                category: 'Social Media',
+                previewBg: 'bg-pink-100 dark:bg-[#2c1020]',
+                preview: (
+                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#fbcfe8]/40 via-[#fda4af]/30 to-[#f472b6]/30 dark:from-[#3b1228] dark:to-[#220d1c] p-1">
+                    <img 
+                      src="/Mobile.png" 
+                      alt="Phone" 
+                      className="w-full h-full object-contain filter drop-shadow-md"
+                    />
+                  </div>
+                ),
+                onClick: () => setMockupTemplate('phone')
+              },
+              {
+                id: 'tablet',
+                name: 'Tablet',
+                category: 'App',
+                previewBg: 'bg-slate-100 dark:bg-[#12141f]',
+                preview: (
+                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#f1f5f9] to-[#cbd5e1] dark:from-[#1a1c29] dark:to-[#0f111a] p-1.5">
+                    <div className="w-12 h-14 bg-slate-900 rounded-lg border border-slate-700 shadow-md flex flex-col items-center justify-between p-1">
+                      <div className="w-full h-full bg-gradient-to-tr from-amber-500/20 via-rose-500/20 to-indigo-500/20 rounded flex items-center justify-center">
+                        <TabletIcon className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </div>
+                    <div className="absolute top-2 right-2 w-2.5 h-4 flex flex-col items-center">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500/70 mb-0.5"></div>
+                      <div className="w-1.5 h-1.5 bg-amber-700/50 rounded-xs"></div>
+                    </div>
+                  </div>
+                ),
+                onClick: () => setMockupTemplate('tablet')
+              },
+              {
+                id: 'guide',
+                name: 'Guide',
+                category: 'Book',
+                previewBg: 'bg-amber-50 dark:bg-[#1a1510]',
+                preview: (
+                  <div className="w-full h-full relative flex items-center justify-center bg-gradient-to-br from-[#fef3c7]/60 to-[#fde68a]/40 dark:from-[#2e2316] dark:to-[#17120a] p-1.5">
+                    <div className="w-16 h-11 bg-white dark:bg-slate-100 rounded shadow-sm border border-amber-200/60 flex flex-col justify-between p-1 text-slate-800">
+                      <div className="w-3/4 h-1 bg-slate-800 rounded"></div>
+                      <div className="w-full h-0.5 bg-slate-300 rounded"></div>
+                      <div className="w-1/2 h-0.5 bg-slate-300 rounded"></div>
+                    </div>
+                    <div className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-stone-700 flex items-center justify-center">
+                      <div className="w-1.5 h-1.5 rounded-full bg-amber-900"></div>
+                    </div>
+                  </div>
+                ),
+                onClick: () => setMockupTemplate('guide')
+              }
+            ];
+
+            const categories = ['All', 'Social Media', 'Webinar', 'Book', 'App'];
+
+            const filteredTemplates = templates.filter((t) => {
+              const matchesSearch = t.name.toLowerCase().includes(templateSearch.toLowerCase());
+              const matchesCategory = templateCategory === 'All' || t.category === templateCategory;
+              return matchesSearch && matchesCategory;
+            });
+
+            return (
+              <div className="flex flex-col gap-4">
+                {/* Search & Filter Bar */}
+                <div className="relative flex items-center">
+                  <Search className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={templateSearch}
+                    onChange={(e) => setTemplateSearch(e.target.value)}
+                    placeholder="Search templates..."
+                    className="w-full bg-slate-100/70 dark:bg-[#111124] border border-slate-200/80 dark:border-[#222240] rounded-xl pl-9 pr-8 py-2 text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-all"
+                  />
+                  <button className="absolute right-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Category Tabs */}
+                <div className="flex items-center space-x-3 overflow-x-auto pb-1 scrollbar-none border-b border-slate-200/60 dark:border-[#1a1a32]">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setTemplateCategory(cat)}
+                      className={`relative pb-2 text-xs font-semibold whitespace-nowrap transition-colors ${
+                        templateCategory === cat
+                          ? 'text-slate-900 dark:text-white'
+                          : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'
+                      }`}
+                    >
+                      {cat}
+                      {templateCategory === cat && (
+                        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full"></span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Template Cards Grid (2 Columns, NO size text) */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {filteredTemplates.map((item) => {
+                    const isSelected = mockupTemplate === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={item.onClick}
+                        className={`group relative text-left rounded-2xl p-1.5 transition-all flex flex-col ${
+                          isSelected
+                            ? 'ring-2 ring-violet-500 bg-violet-500/10 dark:bg-violet-950/30'
+                            : 'hover:bg-slate-100 dark:hover:bg-[#141428]'
+                        }`}
+                      >
+                        {/* Thumbnail container */}
+                        <div className="relative aspect-[16/10] w-full rounded-xl overflow-hidden mb-2 border border-slate-200/60 dark:border-[#222240] shadow-sm">
+                          {item.preview}
+
+                          {/* Selected checkmark badge */}
+                          {isSelected && (
+                            <div className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-violet-600 text-white flex items-center justify-center shadow-lg border border-white/20">
+                              <Check className="w-3 h-3 stroke-[3]" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Title only (NO size text) */}
+                        <span className={`text-xs font-bold px-1 transition-colors ${
+                          isSelected ? 'text-violet-600 dark:text-violet-400' : 'text-slate-800 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white'
+                        }`}>
+                          {item.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* TAB 3: CANVAS */}
+          {activeSidebarTab === 'canvas' && (
+            <div className="flex flex-col gap-4">
+              {/* Brand Selector Dropdown */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                  Brand Preset
+                </label>
+                <SearchableBrandDropdown
+                  selectedBrand={selectedBrand}
+                  onBrandSelect={handleBrandChange}
+                />
+              </div>
+
+              {/* Background Color Picker Input */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                  Background Color
+                </label>
+                <div className="flex items-center space-x-3">
+                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0 shadow-inner">
+                    <input
+                      type="color"
+                      value={backgroundColor === 'transparent' ? '#000000' : backgroundColor}
+                      onChange={(e) => {
+                        setBackgroundColor(e.target.value);
+                        setSelectedBrand('');
+                      }}
+                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
+                      title="Choose custom background color"
+                    />
+                    <div 
+                      className="w-full h-full"
+                      style={{ backgroundColor: backgroundColor === 'transparent' ? '#000000' : backgroundColor }}
+                    >
+                      {backgroundColor === 'transparent' && (
+                        <div className="w-full h-full bg-grid-pattern opacity-40"></div>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    value={backgroundColor}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(val) || val === 'transparent' || val === '') {
+                        setBackgroundColor(val);
+                        setSelectedBrand('');
+                      }
+                    }}
+                    placeholder="#0b0b18"
+                    className="premium-input flex-1"
+                  />
+                </div>
+              </div>
+
+              {/* Quick Background Theme Presets */}
+              <div className="flex flex-wrap gap-2">
+                {colorPresets.map((preset) => (
+                  <button
+                    key={preset.name}
+                    onClick={() => {
+                      setBackgroundColor(preset.value);
+                      setSelectedBrand('');
+                    }}
+                    className={`px-2.5 py-1 rounded-full text-[10px] font-semibold border flex items-center transition-all ${
+                      backgroundColor === preset.value
+                        ? 'bg-indigo-50/80 dark:bg-[#181836] border-indigo-500 dark:border-[#3b82f6] text-indigo-950 dark:text-white font-bold shadow-sm'
+                        : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                  >
+                    <span 
+                      className="w-2 h-2 rounded-full mr-1.5 border border-white/10 flex-shrink-0"
+                      style={{ 
+                        backgroundColor: preset.value === 'transparent' ? '#000000' : preset.value,
+                        backgroundImage: preset.value === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)' : 'none',
+                        backgroundSize: preset.value === 'transparent' ? '4px 4px' : 'auto'
+                      }}
+                    ></span>
+                    {preset.name}
+                  </button>
+                ))}
+              </div>
+
+              {/* Background Image Input */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
+                  <span>Background Image</span>
+                  {backgroundImage && (
+                    <button
+                      onClick={() => setBackgroundImage('')}
+                      className="text-red-400 hover:text-red-300 text-[10px] lowercase tracking-normal font-semibold transition-colors"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </label>
+                
+                <div className="flex items-center space-x-2">
+                  <label className="premium-input flex-1 cursor-pointer text-center flex items-center justify-center space-x-1.5 hover:text-slate-800 dark:hover:text-slate-200">
+                    <ImageIcon className="w-3.5 h-3.5 text-brand" />
+                    <span className="truncate pr-1">
+                      {backgroundImage ? 'Change Image' : 'Upload Image'}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (event.target?.result) {
+                              setBackgroundImage(event.target.result as string);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Output Dimension Inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                    Width
+                  </label>
+                  <input
+                    type="number"
+                    value={outputWidth}
+                    onChange={(e) => {
+                      setOutputWidth(parseInt(e.target.value) || 1200);
+                      setSelectedBrand('');
+                    }}
+                    className="premium-input w-full"
+                    placeholder="1200"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                    Height
+                  </label>
+                  <input
+                    type="number"
+                    value={outputHeight}
+                    onChange={(e) => {
+                      setOutputHeight(parseInt(e.target.value) || 800);
+                      setSelectedBrand('');
+                    }}
+                    className="premium-input w-full"
+                    placeholder="800"
+                  />
+                </div>
+              </div>
+
+              {/* Object Fit Control */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                  Object Fit
+                </label>
+                <div className={`grid grid-cols-2 gap-2 bg-slate-100/70 dark:bg-[#0e0e24] border border-slate-200/60 dark:border-[#1c1c38] p-1 rounded-xl ${
+                  mockupTemplate === 'default' ? 'opacity-40 pointer-events-none select-none' : ''
+                }`}>
+                  <button
+                    disabled={mockupTemplate === 'default'}
+                    onClick={() => {
+                      setObjectFit('contain');
+                      setCoverPosition('0px');
+                      setCoverLeft('0px');
+                      setCoverScale(1.0);
+                    }}
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      objectFit === 'contain'
+                        ? 'bg-[#3359e9] text-white shadow-md'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Contain
+                  </button>
+                  <button
+                    disabled={mockupTemplate === 'default'}
+                    onClick={() => setObjectFit('cover')}
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                      objectFit === 'cover'
+                        ? 'bg-[#3359e9] text-white shadow-md'
+                        : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Cover
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: ADJUST (TRANSFORM) */}
+          {activeSidebarTab === 'adjust' && (
+            <div className="flex flex-col gap-4">
+              {/* Vertical position slider */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                      <input
+                        type="number"
+                        value={parseInt(coverPosition) || 0}
+                        min="-300"
+                        max="300"
+                        onChange={(e) => {
+                          let val = parseInt(e.target.value);
+                          if (isNaN(val)) val = 0;
+                          val = Math.max(-300, Math.min(300, val));
+                          setCoverPosition(`${val}px`);
+                        }}
+                        className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
+                    </div>
+                    <button
+                      onClick={() => setCoverPosition('0px')}
+                      className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                      title="Reset to 0px"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min="-300"
+                  max="300"
+                  value={parseInt(coverPosition) || 0}
+                  onChange={(e) => setCoverPosition(`${e.target.value}px`)}
+                  className="slider-gradient-track mt-1"
+                />
+              </div>
+
+              {/* Horizontal position slider */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                      <input
+                        type="number"
+                        value={parseInt(coverLeft) || 0}
+                        min="-300"
+                        max="300"
+                        onChange={(e) => {
+                          let val = parseInt(e.target.value);
+                          if (isNaN(val)) val = 0;
+                          val = Math.max(-300, Math.min(300, val));
+                          setCoverLeft(`${val}px`);
+                        }}
+                        className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
+                    </div>
+                    <button
+                      onClick={() => setCoverLeft('0px')}
+                      className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                      title="Reset to 0px"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min="-300"
+                  max="300"
+                  value={parseInt(coverLeft) || 0}
+                  onChange={(e) => setCoverLeft(`${e.target.value}px`)}
+                  className="slider-gradient-track mt-1"
+                />
+              </div>
+
+              {/* Zoom slider */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                      <input
+                        type="number"
+                        step="0.05"
+                        value={parseFloat(coverScale.toFixed(2))}
+                        min="0.5"
+                        max="3.0"
+                        onChange={(e) => {
+                          let val = parseFloat(e.target.value);
+                          if (isNaN(val)) val = 1.0;
+                          val = Math.max(0.5, Math.min(3.0, val));
+                          setCoverScale(val);
+                        }}
+                        className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      />
+                      <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">x</span>
+                    </div>
+                    <button
+                      onClick={() => setCoverScale(1.0)}
+                      className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                      title="Reset to 1.00x"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="3.0"
+                  step="0.05"
+                  value={coverScale}
+                  onChange={(e) => setCoverScale(parseFloat(e.target.value))}
+                  className="slider-gradient-track mt-1"
+                />
+              </div>
+
+              {/* Frame Position slider - only for device mockups */}
+              {(mockupTemplate === 'laptop' || mockupTemplate === 'book' || mockupTemplate === 'phone' || mockupTemplate === 'tablet') && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider flex items-center">
+                      <MoveVertical className="w-3 h-3 mr-1 text-brand" />
+                      Frame Position
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                        <input
+                          type="number"
+                          value={frameVerticalOffset}
+                          min="-200"
+                          max="200"
+                          onChange={(e) => {
+                            let val = parseInt(e.target.value);
+                            if (isNaN(val)) val = 0;
+                            val = Math.max(-200, Math.min(200, val));
+                            setFrameVerticalOffset(val);
+                          }}
+                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
+                      </div>
+                      <button
+                        onClick={() => setFrameVerticalOffset(0)}
+                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                        title="Reset to 0px"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="-200"
+                    max="200"
+                    value={frameVerticalOffset}
+                    onChange={(e) => setFrameVerticalOffset(parseInt(e.target.value))}
+                    className="slider-gradient-track mt-1"
+                  />
+                </div>
+              )}
+
+              {/* Frame Scale slider - for all mockups except default */}
+              {mockupTemplate !== 'default' && (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider flex items-center">
+                      <Maximize2 className="w-3.5 h-3.5 mr-1 text-brand" />
+                      Frame Scale
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
+                        <input
+                          type="number"
+                          step="0.05"
+                          value={parseFloat(frameScale.toFixed(2))}
+                          min="0.5"
+                          max="2.0"
+                          onChange={(e) => {
+                            let val = parseFloat(e.target.value);
+                            if (isNaN(val)) val = 1.0;
+                            val = Math.max(0.5, Math.min(2.0, val));
+                            setFrameScale(val);
+                          }}
+                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">x</span>
+                      </div>
+                      <button
+                        onClick={() => setFrameScale(1.0)}
+                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
+                        title="Reset to 1.00x"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2.0"
+                    step="0.05"
+                    value={frameScale}
+                    onChange={(e) => setFrameScale(parseFloat(e.target.value))}
+                    className="slider-gradient-track mt-1"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </aside>
+
+        {/* 3. Right-Side Viewport: Live Mockup Preview Card */}
+        <div className="flex-1 min-w-0 h-full p-6 overflow-y-auto flex flex-col items-center justify-start">
+          
+          {/* Live Preview Header row with Contain / Cover toggle */}
+          <div className="w-full max-w-5xl flex items-center justify-between mb-3 px-1">
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-['Outfit']">
+                Live Preview
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Real-time preview with brand-matching typography
+              </p>
+            </div>
+
+            {/* Contain / Cover toggle pill */}
+            <div className={`bg-slate-100/70 dark:bg-[#0e0e24] border border-slate-200/60 dark:border-[#1c1c38] p-1 rounded-full flex items-center shadow-inner transition-all duration-300 ${
+              mockupTemplate === 'default' ? 'opacity-40 pointer-events-none select-none' : ''
+            }`}>
+              <button
+                disabled={mockupTemplate === 'default'}
+                onClick={() => {
+                  setObjectFit('contain');
+                  setCoverPosition('0px');
+                  setCoverLeft('0px');
+                  setCoverScale(1.0);
+                }}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  objectFit === 'contain'
+                    ? 'bg-[#3359e9] text-white shadow-md'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Contain
+              </button>
+              <button
+                disabled={mockupTemplate === 'default'}
+                onClick={() => setObjectFit('cover')}
+                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                  objectFit === 'cover'
+                    ? 'bg-[#3359e9] text-white shadow-md'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                Cover
+              </button>
             </div>
           </div>
 
-          {/* Middle Column (Live Mockup Preview Viewport) */}
-          <div className="lg:col-span-6 flex flex-col gap-4">
-            
-            {/* Live Preview Header row */}
-            <div className="flex items-center justify-between px-1">
-              <div>
-                <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white font-['Outfit']">
-                  Live Preview
-                </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Your content rendered on the {mockupTemplate.charAt(0).toUpperCase() + mockupTemplate.slice(1)} mockup
-                </p>
-              </div>
-
-              {/* Contain / Cover toggle pill */}
-              <div className={`bg-slate-100/70 dark:bg-[#0e0e24] border border-slate-200/60 dark:border-[#1c1c38] p-1 rounded-full flex items-center shadow-inner transition-all duration-300 ${
-                mockupTemplate === 'default' ? 'opacity-40 pointer-events-none select-none' : ''
-              }`}>
-                <button
-                  disabled={mockupTemplate === 'default'}
-                  onClick={() => {
-                    setObjectFit('contain');
-                    setCoverPosition('0px');
-                    setCoverLeft('0px');
-                    setCoverScale(1.0);
-                  }}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    objectFit === 'contain'
-                      ? 'bg-[#3359e9] text-white shadow-md'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Contain
-                </button>
-                <button
-                  disabled={mockupTemplate === 'default'}
-                  onClick={() => setObjectFit('cover')}
-                  className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                    objectFit === 'cover'
-                      ? 'bg-[#3359e9] text-white shadow-md'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                  }`}
-                >
-                  Cover
-                </button>
-              </div>
-            </div>
-
-            {/* Canvas mockup window panel */}
-            <div className="relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
+          <div className="w-full max-w-5xl relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
               
               {/* Top Canvas Badges */}
               <div className="absolute top-5 left-6 z-10 flex items-center space-x-2">
@@ -1737,429 +2347,13 @@ function App() {
                 </div>
               </div>
             </div>
+
+            {/* Footer inside live preview area */}
+            <footer className="w-full max-w-5xl mt-8 pt-4 pb-2 flex items-center justify-center text-[11px] text-slate-500 dark:text-slate-500 font-semibold tracking-wide border-t border-slate-200/50 dark:border-[#1a1a32]/50">
+              <p>© 2025 Craftora · Crafted with Python + React</p>
+            </footer>
           </div>
-
-          {/* Right Column (Canvas Settings, Transform controls, Pro Tip) */}
-          <div className="lg:col-span-3 flex flex-col gap-6">
-
-            {/* 1. Canvas settings card */}
-            <div className="premium-card rounded-2xl p-5 flex flex-col gap-4">
-              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
-                <Sliders className="w-3.5 h-3.5 mr-1.5 text-brand" />
-                Canvas
-              </h3>
-
-              {/* Brand Selector Dropdown */}
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Brand Preset</span>
-                </label>
-                <SearchableBrandDropdown
-                  selectedBrand={selectedBrand}
-                  onBrandSelect={handleBrandChange}
-                />
-              </div>
-
-              {/* Background Color Picker Input */}
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                  Background
-                </label>
-                <div className="flex items-center space-x-3">
-                  <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-200/80 dark:border-[#2b2b54] cursor-pointer flex-shrink-0 shadow-inner">
-                    <input
-                      type="color"
-                      value={backgroundColor === 'transparent' ? '#000000' : backgroundColor}
-                      onChange={(e) => {
-                        setBackgroundColor(e.target.value);
-                        setSelectedBrand('');
-                      }}
-                      className="absolute inset-0 w-full h-full p-0 border-0 cursor-pointer opacity-0"
-                      title="Choose custom background color"
-                    />
-                    <div 
-                      className="w-full h-full"
-                      style={{ backgroundColor: backgroundColor === 'transparent' ? '#000000' : backgroundColor }}
-                    >
-                      {backgroundColor === 'transparent' && (
-                        <div className="w-full h-full bg-grid-pattern opacity-40"></div>
-                      )}
-                    </div>
-                  </div>
-                  <input
-                    type="text"
-                    value={backgroundColor}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (/^#([0-9A-Fa-f]{3}){1,2}$/.test(val) || val === 'transparent' || val === '') {
-                        setBackgroundColor(val);
-                        setSelectedBrand('');
-                      }
-                    }}
-                    placeholder="#0b0b18"
-                    className="premium-input flex-1"
-                  />
-                </div>
-              </div>
-
-              {/* Background Image Input */}
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider flex items-center justify-between">
-                  <span>Background Image</span>
-                  {backgroundImage && (
-                    <button
-                      onClick={() => setBackgroundImage('')}
-                      className="text-red-400 hover:text-red-300 text-[10px] lowercase tracking-normal font-semibold transition-colors"
-                    >
-                      Clear
-                    </button>
-                  )}
-                </label>
-                
-                <div className="flex items-center space-x-2">
-                  <label className="premium-input flex-1 cursor-pointer text-center flex items-center justify-center space-x-1.5 hover:text-slate-800 dark:hover:text-slate-200">
-                    <ImageIcon className="w-3.5 h-3.5 text-brand" />
-                    <span className="truncate pr-1">
-                      {backgroundImage ? 'Change Image' : 'Upload Image'}
-                    </span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            if (event.target?.result) {
-                              setBackgroundImage(event.target.result as string);
-                            }
-                          };
-                          reader.readAsDataURL(file);
-                        }
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-              </div>
-
-              {/* Output Dimension Inputs */}
-              <div className="grid grid-cols-2 gap-3.5">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Width
-                  </label>
-                  <input
-                    type="number"
-                    value={outputWidth}
-                    onChange={(e) => {
-                      setOutputWidth(parseInt(e.target.value) || 1200);
-                      setSelectedBrand('');
-                    }}
-                    className="premium-input w-full"
-                    placeholder="1200"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
-                    Height
-                  </label>
-                  <input
-                    type="number"
-                    value={outputHeight}
-                    onChange={(e) => {
-                      setOutputHeight(parseInt(e.target.value) || 800);
-                      setSelectedBrand('');
-                    }}
-                    className="premium-input w-full"
-                    placeholder="800"
-                  />
-                </div>
-              </div>
-
-              {/* Quick Background Theme Presets */}
-              <div className="flex flex-wrap gap-2.5 mt-2">
-                {colorPresets.map((preset) => (
-                  <button
-                    key={preset.name}
-                    onClick={() => {
-                      setBackgroundColor(preset.value);
-                      setSelectedBrand('');
-                    }}
-                    className={`px-3 py-1 rounded-full text-[10px] font-semibold border flex items-center transition-all ${
-                      backgroundColor === preset.value
-                        ? 'bg-indigo-50/80 dark:bg-[#181836] border-indigo-500 dark:border-[#3b82f6] text-indigo-950 dark:text-white font-bold shadow-sm'
-                        : 'bg-white/40 dark:bg-[#0c0c1c]/60 border-slate-200/60 dark:border-[#1c1c38] text-slate-500 dark:text-slate-400 hover:border-slate-350 dark:hover:border-slate-700 hover:text-slate-800 dark:hover:text-slate-200'
-                    }`}
-                  >
-                    <span 
-                      className="w-2 h-2 rounded-full mr-1.5 border border-white/10 flex-shrink-0"
-                      style={{ 
-                        backgroundColor: preset.value === 'transparent' ? '#000000' : preset.value,
-                        backgroundImage: preset.value === 'transparent' ? 'linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)' : 'none',
-                        backgroundSize: preset.value === 'transparent' ? '4px 4px' : 'auto'
-                      }}
-                    ></span>
-                    {preset.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 2. Transform Sliders card */}
-            <div className="premium-card rounded-2xl p-5 flex flex-col gap-5">
-              <h3 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-widest flex items-center">
-                <Maximize2 className="w-3.5 h-3.5 mr-1.5 text-brand" />
-                Transform
-              </h3>
-
-              <div className="flex flex-col gap-4">
-                {/* Vertical position slider */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Vertical</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
-                        <input
-                          type="number"
-                          value={parseInt(coverPosition) || 0}
-                          min="-300"
-                          max="300"
-                          onChange={(e) => {
-                            let val = parseInt(e.target.value);
-                            if (isNaN(val)) val = 0;
-                            val = Math.max(-300, Math.min(300, val));
-                            setCoverPosition(`${val}px`);
-                          }}
-                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
-                      </div>
-                      <button
-                        onClick={() => setCoverPosition('0px')}
-                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
-                        title="Reset to 0px"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="-300"
-                    max="300"
-                    value={parseInt(coverPosition) || 0}
-                    onChange={(e) => setCoverPosition(`${e.target.value}px`)}
-                    className="slider-gradient-track mt-1"
-                  />
-                </div>
-
-                {/* Horizontal position slider */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Horizontal</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
-                        <input
-                          type="number"
-                          value={parseInt(coverLeft) || 0}
-                          min="-300"
-                          max="300"
-                          onChange={(e) => {
-                            let val = parseInt(e.target.value);
-                            if (isNaN(val)) val = 0;
-                            val = Math.max(-300, Math.min(300, val));
-                            setCoverLeft(`${val}px`);
-                          }}
-                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
-                      </div>
-                      <button
-                        onClick={() => setCoverLeft('0px')}
-                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
-                        title="Reset to 0px"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="-300"
-                    max="300"
-                    value={parseInt(coverLeft) || 0}
-                    onChange={(e) => setCoverLeft(`${e.target.value}px`)}
-                    className="slider-gradient-track mt-1"
-                  />
-                </div>
-
-                {/* Zoom slider */}
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider">Zoom</span>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
-                        <input
-                          type="number"
-                          step="0.05"
-                          value={parseFloat(coverScale.toFixed(2))}
-                          min="0.5"
-                          max="3.0"
-                          onChange={(e) => {
-                            let val = parseFloat(e.target.value);
-                            if (isNaN(val)) val = 1.0;
-                            val = Math.max(0.5, Math.min(3.0, val));
-                            setCoverScale(val);
-                          }}
-                          className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">x</span>
-                      </div>
-                      <button
-                        onClick={() => setCoverScale(1.0)}
-                        className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
-                        title="Reset to 1.00x"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="3.0"
-                    step="0.05"
-                    value={coverScale}
-                    onChange={(e) => setCoverScale(parseFloat(e.target.value))}
-                    className="slider-gradient-track mt-1"
-                  />
-                </div>
-
-                {/* Frame Position slider - only for device mockups */}
-                {(mockupTemplate === 'laptop' || mockupTemplate === 'book' || mockupTemplate === 'phone' || mockupTemplate === 'tablet') && (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider flex items-center">
-                        <MoveVertical className="w-3 h-3 mr-1 text-brand" />
-                        Frame Position
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
-                          <input
-                            type="number"
-                            value={frameVerticalOffset}
-                            min="-200"
-                            max="200"
-                            onChange={(e) => {
-                              let val = parseInt(e.target.value);
-                              if (isNaN(val)) val = 0;
-                              val = Math.max(-200, Math.min(200, val));
-                              setFrameVerticalOffset(val);
-                            }}
-                            className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">px</span>
-                        </div>
-                        <button
-                          onClick={() => setFrameVerticalOffset(0)}
-                          className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
-                          title="Reset to 0px"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="-200"
-                      max="200"
-                      value={frameVerticalOffset}
-                      onChange={(e) => setFrameVerticalOffset(parseInt(e.target.value))}
-                      className="slider-gradient-track mt-1"
-                    />
-                  </div>
-                )}
-
-                {/* Frame Scale slider - for all mockups except default */}
-                {mockupTemplate !== 'default' && (
-                  <div className="flex flex-col gap-2">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-semibold text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider flex items-center">
-                        <Maximize2 className="w-3 h-3 mr-1 text-brand" />
-                        Frame Scale
-                      </span>
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex items-center bg-indigo-50 dark:bg-[#10102a] border border-indigo-100 dark:border-[#1c1c3c] rounded-lg px-2 py-0.5 shadow-sm">
-                          <input
-                            type="number"
-                            step="0.05"
-                            value={parseFloat(frameScale.toFixed(2))}
-                            min="0.5"
-                            max="2.0"
-                            onChange={(e) => {
-                              let val = parseFloat(e.target.value);
-                              if (isNaN(val)) val = 1.0;
-                              val = Math.max(0.5, Math.min(2.0, val));
-                              setFrameScale(val);
-                            }}
-                            className="w-10 text-right bg-transparent text-indigo-600 dark:text-indigo-300 font-bold text-[10px] focus:outline-none border-none p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <span className="text-indigo-400 dark:text-indigo-500 font-bold text-[10px] ml-0.5 select-none">x</span>
-                        </div>
-                        <button
-                          onClick={() => setFrameScale(1.0)}
-                          className="text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all p-1 rounded-lg hover:bg-indigo-50/50 dark:hover:bg-[#10102a]"
-                          title="Reset to 1.00x"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="2.0"
-                      step="0.05"
-                      value={frameScale}
-                      onChange={(e) => setFrameScale(parseFloat(e.target.value))}
-                      className="slider-gradient-track mt-1"
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* 3. Pro tip card */}
-            <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/30 dark:from-[#0c0c20]/60 dark:to-[#10082c]/40 border border-indigo-100 dark:border-purple-500/10 rounded-2xl p-5 shadow-lg flex flex-col gap-2.5 transition-colors duration-300">
-              <h4 className="text-xs font-semibold text-slate-800 dark:text-white flex items-center">
-                <HelpCircle className="w-3.5 h-3.5 mr-1.5 text-brand" />
-                Pro tip
-              </h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal">
-                Hold the canvas and drag to nudge content. Use Fit to recenter at 100%.
-              </p>
-              <a 
-                href="#" 
-                className="text-[10px] font-bold text-indigo-500 hover:text-indigo-600 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center mt-1 transition-colors"
-              >
-                Learn shortcuts 
-                <ExternalLink className="w-2.5 h-2.5 ml-1" />
-              </a>
-            </div>
-
-          </div>
-
-        </div>
       </main>
-
-      {/* Crafted Footer */}
-      <footer className="border-t border-slate-200 dark:border-[#1c1c38] bg-slate-100 dark:bg-[#05050d] py-6 transition-colors duration-300">
-        <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-center text-[11px] text-slate-600 dark:text-slate-500 font-semibold tracking-wide">
-          <p>© 2025 Craftora · Crafted with Python + React</p>
-        </div>
-      </footer>
 
       {/* Document Text Editing Modal Popup (Clean Native PDF & OCR) */}
       {isEditingText && (() => {
