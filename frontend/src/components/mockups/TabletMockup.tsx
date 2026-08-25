@@ -57,7 +57,8 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
             position: 'relative', 
             top: `${frameVerticalOffset}px`,
             transform: `scale(${frameScale})`,
-            transformOrigin: 'center center'
+            transformOrigin: 'center center',
+            transition: 'top 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}
         >
           {/* Top Camera Dot */}
@@ -79,7 +80,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
                 <img
                   src={imageUrl}
                   alt="Tablet display content"
-                  className={`absolute left-0 right-0 mx-auto w-full h-full transition-transform duration-75 ${
+                  className={`absolute left-0 right-0 mx-auto w-full h-full ${
                     objectFit === 'contain'
                       ? 'object-contain max-w-full max-h-full w-auto h-auto'
                       : 'object-cover'
@@ -90,6 +91,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
                           top: '50%',
                           left: '50%',
                           transform: `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`,
+                          transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
                         }
                       : {
                           top: '50%',
@@ -98,6 +100,7 @@ const TabletMockup = forwardRef<HTMLDivElement, TabletMockupProps>(
                           width: `${100 * coverScale}%`,
                           height: `${100 * coverScale}%`,
                           objectPosition: `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`,
+                          transition: 'width 0.45s ease-out, height 0.45s ease-out, object-position 0.45s ease-out'
                         }
                   }
                   crossOrigin="anonymous"

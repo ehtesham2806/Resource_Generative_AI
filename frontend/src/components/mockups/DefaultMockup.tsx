@@ -68,7 +68,7 @@ const DefaultMockup = forwardRef<HTMLDivElement, DefaultMockupProps>(
             style={{
               transform: `scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`,
               transformOrigin: isPortrait ? 'bottom center' : 'center center',
-              transition: 'transform 0.075s ease-out',
+              transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)',
             }}
             crossOrigin="anonymous"
           />

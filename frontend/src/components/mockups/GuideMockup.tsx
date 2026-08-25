@@ -113,13 +113,15 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                       height: '50%',
                       backgroundColor: dominantColor || '#1a1a2e',
                       transform: `scale(${coverScale})`,
-                      transformOrigin: 'center center'
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }
                   : {
                       width: '45%',
                       backgroundColor: dominantColor || '#1a1a2e',
                       transform: `scale(${coverScale})`,
-                      transformOrigin: 'center center'
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
                     }
               }
             >
@@ -143,6 +145,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                             top: '50%',
                             left: '50%',
                             transform: `translate(-50%, -50%) translate(${coverLeft}, ${coverPosition})`,
+                            transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
                           }
                         : {
                             top: '50%',
@@ -151,6 +154,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                             width: '100%',
                             height: '100%',
                             objectPosition: `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`,
+                            transition: 'object-position 0.45s ease-out'
                           }
                     }
                     crossOrigin="anonymous"
@@ -195,7 +199,7 @@ const GuideMockup = forwardRef<HTMLDivElement, GuideMockupProps>(
                   className={`relative font-extrabold tracking-tight mb-0 font-['Outfit'] leading-tight break-words cursor-text rounded-lg p-1 transition-all select-text w-full outline-none focus:outline-none focus:ring-0 focus-visible:outline-none min-h-[1.5em] ${
                     isHeadingEmpty ? 'is-empty' : ''
                   } ${
-                    activePopover === 'heading'
+                    activeTextSection === 'heading'
                       ? 'ring-0 outline-none'
                       : 'hover:ring-1 hover:ring-fuchsia-500/50'
                   }`}

@@ -142,6 +142,7 @@ function App() {
   const [guideDescriptionSize, setGuideDescriptionSize] = useState<number>(14);
   const [guideShowDescription, setGuideShowDescription] = useState<boolean>(true);
   const [activeTextSection, setActiveTextSection] = useState<'heading' | 'description' | 'badge' | null>(null);
+  const [isBrandAnimating, setIsBrandAnimating] = useState<boolean>(false);
 
   const [exportScale, setExportScale] = useState<number>(1);
   const [isScaleDropdownOpen, setIsScaleDropdownOpen] = useState<boolean>(false);
@@ -487,6 +488,17 @@ function App() {
       setOutputWidth(brand.width);
       setOutputHeight(brand.height);
       setBackgroundColor(brand.bgcolor);
+      
+      // Trigger a sleek reset animation
+      setIsBrandAnimating(true);
+      setTimeout(() => setIsBrandAnimating(false), 450);
+
+      // Reset all Adjust values when switching brands
+      setCoverPosition('0px');
+      setCoverLeft('0px');
+      setCoverScale(1.0);
+      setFrameVerticalOffset(0);
+      setFrameScale(1.0);
     }
   };
 
@@ -1296,6 +1308,23 @@ function App() {
               {activeSidebarTab === 'canvas' && 'Canvas Settings'}
               {activeSidebarTab === 'adjust' && 'Transform & Adjust'}
             </h3>
+
+            {activeSidebarTab === 'adjust' && (
+              <button
+                onClick={() => {
+                  setCoverPosition('0px');
+                  setCoverLeft('0px');
+                  setCoverScale(1.0);
+                  setFrameVerticalOffset(0);
+                  setFrameScale(1.0);
+                }}
+                className="flex items-center space-x-1.5 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-brand dark:text-slate-400 dark:hover:text-indigo-300 bg-slate-100/80 hover:bg-indigo-50/80 dark:bg-[#121226] dark:hover:bg-[#1c1c3c] border border-slate-200/80 dark:border-[#1e1e3e] rounded-lg transition-all shadow-sm hover:scale-[1.02] active:scale-[0.98] cursor-pointer select-none"
+                title="Reset all transform & adjust sliders"
+              >
+                <RotateCcw className="w-3 h-3 text-slate-400 dark:text-slate-500 group-hover:text-brand" />
+                <span>Reset All</span>
+              </button>
+            )}
           </div>
 
           {/* TAB 1: UPLOAD */}
@@ -2337,169 +2366,179 @@ function App() {
               </div>
 
               {/* Centered device container */}
-              <div className="w-full flex items-center justify-center py-6 mt-4">
-                {mockupTemplate === 'default' ? (
-                  <DefaultMockup
-                    ref={defaultMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    imageWidth={imageWidth}
-                    imageHeight={imageHeight}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                  />
-                ) : mockupTemplate === 'laptop' ? (
-                  <LaptopMockup
-                    ref={laptopMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                    frameVerticalOffset={frameVerticalOffset}
-                    frameScale={frameScale}
-                  />
-                ) : mockupTemplate === 'book' ? (
-                  <BookMockup
-                    ref={bookMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                    frameVerticalOffset={frameVerticalOffset}
-                    frameScale={frameScale}
-                  />
-                ) : mockupTemplate === 'phone' ? (
-                  <PhoneMockup
-                    ref={phoneMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                    frameVerticalOffset={frameVerticalOffset}
-                    frameScale={frameScale}
-                  />
-                ) : mockupTemplate === 'tablet' ? (
-                  <TabletMockup
-                    ref={tabletMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                    frameVerticalOffset={frameVerticalOffset}
-                    frameScale={frameScale}
-                  />
-                ) : mockupTemplate === 'webinar' ? (
-                  <WebinarMockup
-                    ref={webinarMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    frameScale={frameScale}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                    heading={webinarHeading}
-                    description={webinarDescription}
-                    headingColor={webinarHeadingColor}
-                    headingSize={webinarHeadingSize}
-                    descriptionColor={webinarDescriptionColor}
-                    descriptionSize={webinarDescriptionSize}
-                    showBadge={webinarShowBadge}
-                    badgeText={webinarBadgeText}
-                    badgeBgColor={webinarBadgeBgColor}
-                    badgeBorderColor={webinarBadgeBorderColor}
-                    badgeTextColor={webinarBadgeTextColor}
-                    badgeDotColor={webinarBadgeDotColor}
-                    activeTextSection={activeTextSection}
-                    onSelectSection={setActiveTextSection}
-                    onHeadingChange={setWebinarHeading}
-                    onHeadingColorChange={setWebinarHeadingColor}
-                    onHeadingSizeChange={setWebinarHeadingSize}
-                    onDescriptionChange={setWebinarDescription}
-                    onDescriptionColorChange={setWebinarDescriptionColor}
-                    onDescriptionSizeChange={setWebinarDescriptionSize}
-                    onBadgeTextChange={setWebinarBadgeText}
-                    onBadgeBgColorChange={setWebinarBadgeBgColor}
-                    onBadgeBorderColorChange={setWebinarBadgeBorderColor}
-                    onBadgeTextColorChange={setWebinarBadgeTextColor}
-                    onBadgeDotColorChange={setWebinarBadgeDotColor}
-                    onShowBadgeChange={setWebinarShowBadge}
-                    showDescription={webinarShowDescription}
-                    onShowDescriptionChange={setWebinarShowDescription}
-                  />
-                ) : (
-                  <GuideMockup
-                    ref={guideMockupRef}
-                    imageUrl={imageUrl}
-                    isLoading={isLoading}
-                    dominantColor={dominantColor}
-                    objectFit={objectFit}
-                    coverPosition={coverPosition}
-                    coverLeft={coverLeft}
-                    coverScale={coverScale}
-                    frameScale={frameScale}
-                    backgroundColor={backgroundColor}
-                    backgroundImage={backgroundImage}
-                    outputWidth={outputWidth}
-                    outputHeight={outputHeight}
-                    heading={guideHeading}
-                    description={guideDescription}
-                    headingColor={guideHeadingColor}
-                    headingSize={guideHeadingSize}
-                    descriptionColor={guideDescriptionColor}
-                    descriptionSize={guideDescriptionSize}
-                    showDescription={guideShowDescription}
-                    activeTextSection={activeTextSection}
-                    onSelectSection={(section) => setActiveTextSection(section as 'heading' | 'description')}
-                    onHeadingChange={setGuideHeading}
-                    onHeadingColorChange={setGuideHeadingColor}
-                    onHeadingSizeChange={setGuideHeadingSize}
-                    onDescriptionChange={setGuideDescription}
-                    onDescriptionColorChange={setGuideDescriptionColor}
-                    onDescriptionSizeChange={setGuideDescriptionSize}
-                    onShowDescriptionChange={setGuideShowDescription}
-                  />
-                )}
+              <div className="w-full flex items-center justify-center py-4 mt-8 mb-2">
+                <div
+                  className={`w-full flex items-center justify-center transition-all duration-300 ${
+                    isBrandAnimating ? 'scale-[0.98] opacity-80 blur-[0.3px]' : 'scale-100 opacity-100 blur-0'
+                  }`}
+                  style={{
+                    maxWidth: `min(100%, min(680px, calc(460px * (${outputWidth} / ${outputHeight}))))`,
+                    transition: 'max-width 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.3s ease-out, filter 0.3s ease-out',
+                  }}
+                >
+                  {mockupTemplate === 'default' ? (
+                    <DefaultMockup
+                      ref={defaultMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      imageWidth={imageWidth}
+                      imageHeight={imageHeight}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                    />
+                  ) : mockupTemplate === 'laptop' ? (
+                    <LaptopMockup
+                      ref={laptopMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                      frameVerticalOffset={frameVerticalOffset}
+                      frameScale={frameScale}
+                    />
+                  ) : mockupTemplate === 'book' ? (
+                    <BookMockup
+                      ref={bookMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                      frameVerticalOffset={frameVerticalOffset}
+                      frameScale={frameScale}
+                    />
+                  ) : mockupTemplate === 'phone' ? (
+                    <PhoneMockup
+                      ref={phoneMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                      frameVerticalOffset={frameVerticalOffset}
+                      frameScale={frameScale}
+                    />
+                  ) : mockupTemplate === 'tablet' ? (
+                    <TabletMockup
+                      ref={tabletMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                      frameVerticalOffset={frameVerticalOffset}
+                      frameScale={frameScale}
+                    />
+                  ) : mockupTemplate === 'webinar' ? (
+                    <WebinarMockup
+                      ref={webinarMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      frameScale={frameScale}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                      heading={webinarHeading}
+                      description={webinarDescription}
+                      headingColor={webinarHeadingColor}
+                      headingSize={webinarHeadingSize}
+                      descriptionColor={webinarDescriptionColor}
+                      descriptionSize={webinarDescriptionSize}
+                      showBadge={webinarShowBadge}
+                      badgeText={webinarBadgeText}
+                      badgeBgColor={webinarBadgeBgColor}
+                      badgeBorderColor={webinarBadgeBorderColor}
+                      badgeTextColor={webinarBadgeTextColor}
+                      badgeDotColor={webinarBadgeDotColor}
+                      activeTextSection={activeTextSection}
+                      onSelectSection={setActiveTextSection}
+                      onHeadingChange={setWebinarHeading}
+                      onHeadingColorChange={setWebinarHeadingColor}
+                      onHeadingSizeChange={setWebinarHeadingSize}
+                      onDescriptionChange={setWebinarDescription}
+                      onDescriptionColorChange={setWebinarDescriptionColor}
+                      onDescriptionSizeChange={setWebinarDescriptionSize}
+                      onBadgeTextChange={setWebinarBadgeText}
+                      onBadgeBgColorChange={setWebinarBadgeBgColor}
+                      onBadgeBorderColorChange={setWebinarBadgeBorderColor}
+                      onBadgeTextColorChange={setWebinarBadgeTextColor}
+                      onBadgeDotColorChange={setWebinarBadgeDotColor}
+                      onShowBadgeChange={setWebinarShowBadge}
+                      showDescription={webinarShowDescription}
+                      onShowDescriptionChange={setWebinarShowDescription}
+                    />
+                  ) : (
+                    <GuideMockup
+                      ref={guideMockupRef}
+                      imageUrl={imageUrl}
+                      isLoading={isLoading}
+                      dominantColor={dominantColor}
+                      objectFit={objectFit}
+                      coverPosition={coverPosition}
+                      coverLeft={coverLeft}
+                      coverScale={coverScale}
+                      frameScale={frameScale}
+                      backgroundColor={backgroundColor}
+                      backgroundImage={backgroundImage}
+                      outputWidth={outputWidth}
+                      outputHeight={outputHeight}
+                      heading={guideHeading}
+                      description={guideDescription}
+                      headingColor={guideHeadingColor}
+                      headingSize={guideHeadingSize}
+                      descriptionColor={guideDescriptionColor}
+                      descriptionSize={guideDescriptionSize}
+                      showDescription={guideShowDescription}
+                      activeTextSection={activeTextSection}
+                      onSelectSection={(section) => setActiveTextSection(section as 'heading' | 'description')}
+                      onHeadingChange={setGuideHeading}
+                      onHeadingColorChange={setGuideHeadingColor}
+                      onHeadingSizeChange={setGuideHeadingSize}
+                      onDescriptionChange={setGuideDescription}
+                      onDescriptionColorChange={setGuideDescriptionColor}
+                      onDescriptionSizeChange={setGuideDescriptionSize}
+                      onShowDescriptionChange={setGuideShowDescription}
+                    />
+                  )}
+                </div>
               </div>
 
               {/* Bottom Canvas control bar */}

@@ -54,7 +54,8 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
             position: 'relative', 
             top: `${frameVerticalOffset}px`,
             transform: `scale(${frameScale})`,
-            transformOrigin: 'center center'
+            transformOrigin: 'center center',
+            transition: 'top 0.45s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
           }}
         >
           {/* Book base image */}
@@ -89,6 +90,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
                         top: '50%',
                         left: '50%',
                         transform: `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`,
+                        transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
                       }
                     : {
                         top: '50%',
@@ -97,6 +99,7 @@ const BookMockup = forwardRef<HTMLDivElement, BookMockupProps>(
                         width: `${100 * coverScale}%`,
                         height: `${100 * coverScale}%`,
                         objectPosition: `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`,
+                        transition: 'width 0.45s ease-out, height 0.45s ease-out, object-position 0.45s ease-out'
                       }
                 }
                 crossOrigin="anonymous"

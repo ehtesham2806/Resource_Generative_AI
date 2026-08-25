@@ -272,7 +272,8 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                   ? { width: '56%', height: 'auto', backgroundColor: dominantColor || undefined }
                   : { height: '82%', width: 'auto', backgroundColor: dominantColor || undefined }),
                 transform: `scale(${frameScale})`,
-                transformOrigin: 'center center'
+                transformOrigin: 'center center',
+                transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
               }}
             >
               {isLoading ? (
@@ -295,6 +296,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                             top: '50%',
                             left: '50%',
                             transform: `translate(-50%, -50%) scale(${coverScale}) translate(${coverLeft}, ${coverPosition})`,
+                            transition: 'transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)'
                           }
                         : {
                             top: '50%',
@@ -303,6 +305,7 @@ const WebinarMockup = forwardRef<HTMLDivElement, WebinarMockupProps>(
                             width: `${100 * coverScale}%`,
                             height: `${100 * coverScale}%`,
                             objectPosition: `calc(50% + ${coverLeft}) calc(50% + ${coverPosition})`,
+                            transition: 'width 0.45s ease-out, height 0.45s ease-out, object-position 0.45s ease-out'
                           }
                     }
                     crossOrigin="anonymous"
