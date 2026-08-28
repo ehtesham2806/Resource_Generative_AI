@@ -148,12 +148,43 @@ def detect_text_regions(pil_image: Image.Image) -> list:
         logger.error(f"Error detecting text regions: {str(e)}")
         return []
 
-def apply_text_edits(pil_image: Image.Image, edits: list) -> Image.Image:
+def get_font(font_name: str = "arial", font_size: int = 14, is_bold: bool = False, is_italic: bool = False):
+    """
+    Load a font matching the name, size, and styling.
+    """
+    fn_lower = font_name.lower()
+    if is_bold and is_italic:
+        font_files = ["arialbi.ttf", "calibriz.ttf", "seguisbi.ttf", "arialbd.ttf", "arial.ttf"]
+    elif is_bold or "bold" in fn_lower:
+        font_files = ["arialbd.ttf", "calibrib.ttf", "seguisb.ttf", "arial.ttf"]
+    elif is_italic or "italic" in fn_lower:
+        font_files = ["ariali.ttf", "calibrii.ttf", "seguisi.ttf", "arial.ttf"]
+    elif "times" in fn_lower or "serif" in fn_lower:
+        font_files = ["times.ttf", "timesbd.ttf", "georgia.ttf", "arial.ttf"]
+    elif "courier" in fn_lower or "mono" in fn_lower or "consolas" in fn_lower:
+        font_files = ["consola.ttf", "cour.ttf", "arial.ttf"]
+    else:
+        font_files = ["arial.ttf", "calibri.ttf", "segoeui.ttf"]
+
+    for ff in font_files:
+        p = os.path.join(r"C:\Windows\Fonts", ff)
+        if os.path.exists(p):
+            try:
+                return ImageFont.truetype(p, size=max(8, int(font_size)))
+            except:
+                pass
+        try:
+            return ImageFont.truetype(ff, size=max(8, int(font_size)))
+        except:
+            pass
+
+    return ImageFont.load_default()
+
+def apply_text_edits(pil_image: Image.Image, edits: list, page_width_pts: float = 0, page_height_pts: float = 0) -> Image.Image:
     """
     Perform inpainting for all removed/replaced text bounding boxes,
-    and render replacement text with preserved styles.
+    and render replacement & newly added text with preserved styles and positions.
     """
-    # Convert PIL to OpenCV BGR image for cv2.inpaint
     img_np = np.array(pil_image)
     if len(img_np.shape) == 3 and img_np.shape[2] == 4:
         img_np = cv2.cvtColor(img_np, cv2.COLOR_RGBA2BGR)
@@ -163,104 +194,154 @@ def apply_text_edits(pil_image: Image.Image, edits: list) -> Image.Image:
         img_np = cv2.cvtColor(img_np, cv2.COLOR_GRAY2BGR)
         
     h_img, w_img = img_np.shape[:2]
+    pw = page_width_pts if page_width_pts > 0 else w_img
+    ph = page_height_pts if page_height_pts > 0 else h_img
     
     # Create mask for inpainting
     mask = np.zeros((h_img, w_img), dtype=np.uint8)
     
-    # Fill bounding boxes on mask for edits (both remove and replace need inpainting)
-    valid_edits = []
+    # 1. Build inpainting mask for removed or replaced text blocks
     for edit in edits:
-        box = edit.get('box')
-        if not box:
+        action = edit.get('action')
+        if action not in ('remove', 'replace'):
             continue
-        valid_edits.append(edit)
-        pts = np.array(box, dtype=np.int32)
-        cv2.fillPoly(mask, [pts], 255)
+
+        rel_box = edit.get('rel_box')
+        pdf_rect = edit.get('orig_pdf_rect') or edit.get('pdf_rect')
+        orig_box = edit.get('orig_box') or edit.get('box')
+
+        if rel_box and isinstance(rel_box, dict):
+            rx = float(rel_box.get('left', 0)) / 100.0 * w_img
+            ry = float(rel_box.get('top', 0)) / 100.0 * h_img
+            rw = float(rel_box.get('width', 0)) / 100.0 * w_img
+            rh = float(rel_box.get('height', 0)) / 100.0 * h_img
+            x0 = max(0, int(rx - 2))
+            y0 = max(0, int(ry - 2))
+            x1 = min(w_img, int(rx + rw + 2))
+            y1 = min(h_img, int(ry + rh + 2))
+            cv2.rectangle(mask, (x0, y0), (x1, y1), 255, -1)
+        elif pdf_rect and len(pdf_rect) >= 4:
+            x0 = max(0, int((pdf_rect[0] / pw) * w_img - 2))
+            y0 = max(0, int((pdf_rect[1] / ph) * h_img - 2))
+            x1 = min(w_img, int((pdf_rect[2] / pw) * w_img + 2))
+            y1 = min(h_img, int((pdf_rect[3] / ph) * h_img + 2))
+            cv2.rectangle(mask, (x0, y0), (x1, y1), 255, -1)
+        elif orig_box and len(orig_box) >= 4:
+            pts = np.array(orig_box, dtype=np.int32)
+            cv2.fillPoly(mask, [pts], 255)
+            
+    if np.any(mask > 0):
+        # Dilate mask slightly to prevent outline bleed
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
+        mask = cv2.dilate(mask, kernel, iterations=1)
         
-    if len(valid_edits) == 0:
-        return pil_image
+        # Apply OpenCV Telea inpainting
+        inpainted = cv2.inpaint(img_np, mask, 3, cv2.INPAINT_TELEA)
+        inpainted_rgb = cv2.cvtColor(inpainted, cv2.COLOR_BGR2RGB)
+        result_pil = Image.fromarray(inpainted_rgb)
+    else:
+        result_pil = pil_image.convert("RGB")
         
-    # Dilate mask slightly to prevent outline bleed
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-    mask = cv2.dilate(mask, kernel, iterations=1)
+    draw = ImageDraw.Draw(result_pil)
     
-    # Apply OpenCV Telea inpainting
-    inpainted = cv2.inpaint(img_np, mask, 3, cv2.INPAINT_TELEA)
-    
-    # Convert back to PIL RGB image
-    inpainted_rgb = cv2.cvtColor(inpainted, cv2.COLOR_BGR2RGB)
-    result_pil = Image.fromarray(inpainted_rgb)
-    
-    # Load Arial font path if available on Windows
-    font_path = "C:\\Windows\\Fonts\\arial.ttf"
-    if not os.path.exists(font_path):
-        font_path = "C:\\Windows\\Fonts\\Arial.ttf"
-    if not os.path.exists(font_path):
-        font_path = None
-        
-    # Now draw new text overlay for "replace" actions
-    for edit in valid_edits:
-        if edit.get('action') != 'replace':
+    # 2. Draw replacement and new text at exact coordinates
+    for edit in edits:
+        action = edit.get('action', 'replace')
+        if action == 'remove':
             continue
             
         new_text = edit.get('new_text', '')
         if not new_text:
             continue
             
-        box = edit.get('box')
-        angle = edit.get('angle', 0.0)
+        # Determine color
         color = edit.get('color', [0, 0, 0])
-        color_tuple = tuple(int(c) for c in color)
+        if isinstance(color, str):
+            if color.startswith('#'):
+                color_hex = color.lstrip('#')
+                if len(color_hex) == 6:
+                    color = [int(color_hex[i:i+2], 16) for i in (0, 2, 4)]
+                elif len(color_hex) == 3:
+                    color = [int(c * 2, 16) for c in color_hex]
+                else:
+                    color = [0, 0, 0]
+            else:
+                color = [0, 0, 0]
+        color_tuple = tuple(int(c) for c in color[:3])
         
-        pts = np.array(box, dtype=np.int32)
-        rect = cv2.boundingRect(pts)
-        bx, by, bw, bh = rect
+        # Determine position
+        rel_box = edit.get('rel_box')
+        pdf_rect = edit.get('pdf_rect')
+        box = edit.get('box')
+        angle = float(edit.get('angle', 0.0))
         
-        orig_w = edit.get('width', bw)
-        orig_h = edit.get('height', bh)
+        if rel_box and isinstance(rel_box, dict):
+            rel_left = float(rel_box.get('left', 0.0))
+            rel_top = float(rel_box.get('top', 0.0))
+            rel_w = float(rel_box.get('width', 20.0))
+            rel_h = float(rel_box.get('height', 5.0))
+            
+            px_left = (rel_left / 100.0) * w_img
+            px_top = (rel_top / 100.0) * h_img
+            px_w = max(10, (rel_w / 100.0) * w_img)
+            px_h = max(10, (rel_h / 100.0) * h_img)
+            target_h = int(px_h)
+            target_w = int(px_w)
+        elif pdf_rect and len(pdf_rect) >= 4:
+            px_left = (pdf_rect[0] / pw) * w_img
+            px_top = (pdf_rect[1] / ph) * h_img
+            px_w = ((pdf_rect[2] - pdf_rect[0]) / pw) * w_img
+            px_h = ((pdf_rect[3] - pdf_rect[1]) / ph) * h_img
+            target_h = int(px_h)
+            target_w = int(px_w)
+        elif box and len(box) >= 4:
+            pts = np.array(box, dtype=np.int32)
+            rect = cv2.boundingRect(pts)
+            bx, by, bw, bh = rect
+            px_left = bx
+            px_top = by
+            target_w = edit.get('width', bw)
+            target_h = edit.get('height', bh)
+        else:
+            px_left = w_img * 0.1
+            px_top = h_img * 0.1
+            target_w = int(w_img * 0.3)
+            target_h = int(h_img * 0.06)
+
+        # Font styling
+        is_bold = bool(edit.get('is_bold', False) or edit.get('font_weight') == 'bold' or ('bold' in str(edit.get('font_name', '')).lower()) or (int(edit.get('flags', 0)) & 20))
+        is_italic = bool(edit.get('is_italic', False) or edit.get('font_style') == 'italic' or ('italic' in str(edit.get('font_name', '')).lower()) or (int(edit.get('flags', 0)) & 2))
+        font_name = str(edit.get('font_name', 'arial'))
         
         # Fit font size
-        initial_font_size = max(10, int(orig_h))
-        font = None
-        
-        if font_path:
-            try:
-                font, _ = get_fitting_font(new_text, font_path, orig_w, orig_h, initial_font_size)
-            except Exception as e:
-                logger.error(f"Failed to fit font: {str(e)}")
-                font = None
-                
-        if font is None:
-            font = ImageFont.load_default()
+        explicit_font_size = edit.get('font_size')
+        if explicit_font_size:
+            scaled_font_size = max(12, int(float(explicit_font_size) * (h_img / ph)))
+            scaled_font_size = min(int(target_h * 1.15), scaled_font_size)
+        else:
+            scaled_font_size = max(12, int(target_h * 0.85))
             
-        # Draw on transparent rotated text image overlay
-        pad = max(bw, bh)
-        txt_img = Image.new("RGBA", (bw + pad, bh + pad), (0, 0, 0, 0))
-        txt_draw = ImageDraw.Draw(txt_img)
+        font = get_font(font_name=font_name, font_size=scaled_font_size, is_bold=is_bold, is_italic=is_italic)
         
-        # Centering inside small overlay
+        # Measure text
         if hasattr(font, 'getbbox'):
             t_bbox = font.getbbox(new_text)
-            tw = t_bbox[2] - t_bbox[0]
             th = t_bbox[3] - t_bbox[1]
         else:
-            tw, th = txt_draw.textsize(new_text, font=font) if hasattr(txt_draw, 'textsize') else (bw, bh)
+            th = int(target_h * 0.85)
             
-        tx = (txt_img.width - tw) / 2.0
-        ty = (txt_img.height - th) / 2.0
+        draw_x = int(px_left)
+        draw_y = int(px_top + max(0, (target_h - th) / 2))
         
-        txt_draw.text((tx, ty), new_text, fill=color_tuple + (255,), font=font)
-        
-        # Rotate text (negative angle for clockwise rotation in PIL)
-        rotated_txt = txt_img.rotate(-angle, resample=Image.Resampling.BICUBIC, expand=False)
-        
-        # Calculate center point
-        center_x = sum(pt[0] for pt in box) / 4.0
-        center_y = sum(pt[1] for pt in box) / 4.0
-        
-        paste_x = int(center_x - txt_img.width / 2.0)
-        paste_y = int(center_y - txt_img.height / 2.0)
-        
-        result_pil.paste(rotated_txt, (paste_x, paste_y), rotated_txt)
+        if abs(angle) > 0.01:
+            pad_w = int(target_w) + 80
+            pad_h = int(target_h) + 80
+            txt_img = Image.new("RGBA", (pad_w, pad_h), (0, 0, 0, 0))
+            txt_draw = ImageDraw.Draw(txt_img)
+            txt_draw.text((10, 10), new_text, fill=color_tuple + (255,), font=font)
+            rotated_txt = txt_img.rotate(-angle, resample=Image.Resampling.BICUBIC, expand=True)
+            result_pil.paste(rotated_txt, (draw_x, draw_y), rotated_txt)
+        else:
+            draw.text((draw_x, draw_y), new_text, fill=color_tuple, font=font)
         
     return result_pil

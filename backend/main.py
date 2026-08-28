@@ -2,12 +2,12 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import fitz  # PyMuPDF
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 import io
 import base64
 import os
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import logging
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -105,7 +105,7 @@ async def extract_pdf_image(file: UploadFile = File(...)):
         page_height_pts = float(first_page.rect.height)
         text_dict = first_page.get_text("dict")
         native_text_blocks = []
-        block_idx = 0
+        block_idx = 1
         for block in text_dict.get("blocks", []):
             if block.get("type") == 0:  # Text block
                 for line in block.get("lines", []):
@@ -116,13 +116,26 @@ async def extract_pdf_image(file: UploadFile = File(...)):
                     if not full_text:
                         continue
                     first_span = spans[0]
-                    bbox = line.get("bbox", first_span.get("bbox"))
-                    x0, y0, x1, y1 = float(bbox[0]), float(bbox[1]), float(bbox[2]), float(bbox[3])
+                    font_size = float(first_span.get("size", 12.0))
+                    origin_val = first_span.get("origin")
                     
-                    x0 = max(0.0, min(page_width_pts, x0))
-                    y0 = max(0.0, min(page_height_pts, y0))
-                    x1 = max(0.0, min(page_width_pts, x1))
-                    y1 = max(0.0, min(page_height_pts, y1))
+                    if origin_val and len(origin_val) >= 2:
+                        oy = float(origin_val[1])
+                        tight_y0 = oy - (font_size * 0.72)
+                        tight_y1 = oy + (font_size * 0.16)
+                    else:
+                        bbox = line.get("bbox", first_span.get("bbox"))
+                        raw_h = float(bbox[3]) - float(bbox[1])
+                        tight_y0 = float(bbox[1]) + (raw_h * 0.15)
+                        tight_y1 = float(bbox[3]) - (raw_h * 0.20)
+                        
+                    span_x0 = min(float(s["bbox"][0]) for s in spans)
+                    span_x1 = max(float(s["bbox"][2]) for s in spans)
+                    
+                    x0 = max(0.0, min(page_width_pts, span_x0))
+                    y0 = max(0.0, min(page_height_pts, tight_y0))
+                    x1 = max(0.0, min(page_width_pts, span_x1))
+                    y1 = max(0.0, min(page_height_pts, tight_y1))
                     
                     if x1 <= x0 or y1 <= y0:
                         continue
@@ -136,7 +149,8 @@ async def extract_pdf_image(file: UploadFile = File(...)):
                         "id": f"pdf_txt_{block_idx}",
                         "text": full_text,
                         "pdf_rect": [x0, y0, x1, y1],
-                        "font_size": float(first_span.get("size", 12.0)),
+                        "origin": origin_val if origin_val else [x0, y1 - (font_size * 0.16)],
+                        "font_size": font_size,
                         "font_name": str(first_span.get("font", "Helvetica")),
                         "flags": int(first_span.get("flags", 0)),
                         "color": [r, g, b],
@@ -389,13 +403,15 @@ async def edit_image_text(request: ImageEditRequest):
 
 class PDFTextEditItem(BaseModel):
     id: str
-    pdf_rect: List[float]  # [x0, y0, x1, y1] in PDF points
+    pdf_rect: Optional[List[float]] = None  # [x0, y0, x1, y1] in PDF points
     action: str  # "remove" or "replace"
     new_text: Optional[str] = ""
     original_text: Optional[str] = ""
     font_size: Optional[float] = 12.0
     font_name: Optional[str] = "helv"
     color: Optional[List[int]] = [0, 0, 0]
+    flags: Optional[int] = 0
+    rel_box: Optional[Dict[str, Any]] = None
 
 class PDFEditRequest(BaseModel):
     pdf_data: str  # base64 encoded PDF
@@ -424,85 +440,138 @@ async def edit_pdf_text(request: PDFEditRequest):
             
         page = pdf_doc[request.page_index]
         
-        # Add redactions for all items (both remove and replace require erasing original text)
-        for edit in request.edits:
-            if not edit.pdf_rect or len(edit.pdf_rect) < 4:
-                continue
-            x0, y0, x1, y1 = edit.pdf_rect
-            # Use exact text rectangle without opaque fill to preserve natural background color
-            rect = fitz.Rect(x0, y0, x1, y1)
-            page.add_redact_annot(rect)
-            
-        # Apply redactions to permanently remove original text objects without drawing opaque patches
-        page.apply_redactions(images=fitz.PDF_REDACT_IMAGE_NONE)
+        page_width_pts = float(page.rect.width)
+        page_height_pts = float(page.rect.height)
         
-        # Re-insert replaced text with matching typography
-        for edit in request.edits:
-            if edit.action == "replace" and edit.new_text:
-                x0, y0, x1, y1 = edit.pdf_rect
-                rect = fitz.Rect(x0, y0, x1, y1)
-                
-                # Determine font name
-                fontname = "helv"
-                if edit.font_name:
-                    fn_lower = edit.font_name.lower()
-                    if ("bold" in fn_lower and "italic" in fn_lower) or "oblique" in fn_lower:
-                        fontname = "hebi"
-                    elif "bold" in fn_lower:
-                        fontname = "hebo"
-                    elif "italic" in fn_lower:
-                        fontname = "heit"
-                    elif "times" in fn_lower or "serif" in fn_lower:
-                        fontname = "tiro"
-                    elif "courier" in fn_lower or "mono" in fn_lower:
-                        fontname = "cour"
-                
-                # Normalize color [0..255] -> [0.0..1.0]
-                color_rgb = (0.0, 0.0, 0.0)
-                if edit.color and len(edit.color) >= 3:
-                    color_rgb = (
-                        float(edit.color[0]) / 255.0,
-                        float(edit.color[1]) / 255.0,
-                        float(edit.color[2]) / 255.0
-                    )
-                
-                fontsize = float(edit.font_size or 12.0)
-                
-                # Insert the replacement text
-                page.insert_textbox(
-                    rect,
-                    edit.new_text,
-                    fontsize=fontsize,
-                    fontname=fontname,
-                    color=color_rgb,
-                    align=fitz.TEXT_ALIGN_LEFT
-                )
-                
-        # Re-render page to 300 DPI high-quality pixmap
+        # 1. Extract all original text blocks from the PDF page
+        text_dict = page.get_text("dict")
+        native_blocks = []
+        block_idx = 1
+        for block in text_dict.get("blocks", []):
+            if block.get("type") == 0:  # Text block
+                for line in block.get("lines", []):
+                    spans = line.get("spans", [])
+                    if spans:
+                        line_text = "".join(span.get("text", "") for span in spans).strip()
+                        if line_text:
+                            s0 = spans[0]
+                            font_size = float(s0.get("size", 12.0))
+                            origin_val = s0.get("origin")
+                            color_int = s0.get("color", 0)
+                            r = (color_int >> 16) & 255
+                            g = (color_int >> 8) & 255
+                            b = color_int & 255
+                            native_blocks.append({
+                                "id": f"pdf_txt_{block_idx}",
+                                "text": line_text,
+                                "origin": origin_val if origin_val else [s0["bbox"][0], s0["bbox"][3] - font_size * 0.16],
+                                "font_size": font_size,
+                                "font_name": str(s0.get("font", "Helvetica")),
+                                "flags": int(s0.get("flags", 0)),
+                                "color": [r, g, b]
+                            })
+                            block_idx += 1
+
+        # 2. Strip vector text operators (BT ... ET) to produce 100% pure pristine background (ZERO patchiness)
+        contents = page.get_contents()
+        if contents:
+            import re
+            for xref in contents:
+                try:
+                    stream = pdf_doc.xref_stream(xref).decode('latin1')
+                    clean_stream = re.sub(r'BT\b.*?\bET', '', stream, flags=re.DOTALL)
+                    pdf_doc.update_stream(xref, clean_stream.encode('latin1'))
+                except Exception as stream_err:
+                    logger.warning(f"Could not clean stream {xref}: {stream_err}")
+
+        # 3. Render 100% pristine vector background to 300 DPI high-resolution image
         zoom = 300 / 72
         matrix = fitz.Matrix(zoom, zoom)
         pixmap = page.get_pixmap(matrix=matrix)
         img_data = pixmap.tobytes("png")
-        pil_image = Image.open(io.BytesIO(img_data))
+        pil_bg = Image.open(io.BytesIO(img_data)).convert("RGB")
+        draw = ImageDraw.Draw(pil_bg)
+        w_img, h_img = pil_bg.size
         
-        if pil_image.mode in ("RGBA", "LA", "P"):
-            bg = Image.new("RGB", pil_image.size, (255, 255, 255))
-            if pil_image.mode == "P":
-                pil_image = pil_image.convert("RGBA")
-            bg.paste(pil_image, mask=pil_image.split()[-1] if pil_image.mode == "RGBA" else None)
-            pil_image = bg
+        # 4. Map user edits by block ID
+        edits_map = {getattr(e, "id", ""): e for e in request.edits}
+        from ocr_processor import get_font
+
+        # Render all native text elements with updated values
+        rendered_ids = set()
+        for block in native_blocks:
+            b_id = block["id"]
+            rendered_ids.add(b_id)
+            edit = edits_map.get(b_id)
             
-        dominant_color = get_dominant_color(pil_image)
+            if edit:
+                action = getattr(edit, "action", "replace")
+                if action == "remove":
+                    continue
+                new_text = getattr(edit, "new_text", "")
+                text_to_draw = new_text if (new_text is not None and new_text != "") else block["text"]
+                font_size = float(getattr(edit, "font_size", 0) or block["font_size"])
+                font_name = str(getattr(edit, "font_name", "") or block["font_name"])
+                flags = int(getattr(edit, "flags", 0) or block["flags"])
+                color_val = getattr(edit, "color", None) or block["color"]
+            else:
+                text_to_draw = block["text"]
+                font_size = block["font_size"]
+                font_name = block["font_name"]
+                flags = block["flags"]
+                color_val = block["color"]
+
+            if not text_to_draw:
+                continue
+
+            scaled_font_size = max(10, int(font_size * (h_img / page_height_pts)))
+            is_bold = bool((flags & 20) or "bold" in font_name.lower())
+            is_italic = bool((flags & 2) or "italic" in font_name.lower())
+            
+            font = get_font(font_name=font_name, font_size=scaled_font_size, is_bold=is_bold, is_italic=is_italic)
+            
+            ox = int((block["origin"][0] / page_width_pts) * w_img)
+            oy = int(((block["origin"][1] - font_size * 0.72) / page_height_pts) * h_img)
+            
+            color_tuple = tuple(int(c) for c in color_val[:3]) if isinstance(color_val, (list, tuple)) else (255, 255, 255)
+            draw.text((ox, oy), text_to_draw, fill=color_tuple, font=font)
+
+        # 5. Render any newly added custom text items
+        for edit in request.edits:
+            e_id = getattr(edit, "id", "")
+            if e_id not in rendered_ids and getattr(edit, "action", "") != "remove":
+                new_text = getattr(edit, "new_text", "")
+                if not new_text:
+                    continue
+                rel_box = getattr(edit, "rel_box", None)
+                if rel_box and isinstance(rel_box, dict):
+                    ox = int((float(rel_box.get('left', 10)) / 100.0) * w_img)
+                    oy = int((float(rel_box.get('top', 10)) / 100.0) * h_img)
+                else:
+                    ox = int(w_img * 0.1)
+                    oy = int(h_img * 0.1)
+                font_size = float(getattr(edit, "font_size", 24.0) or 24.0)
+                scaled_font_size = max(10, int(font_size * (h_img / page_height_pts)))
+                font_name = str(getattr(edit, "font_name", "Helvetica"))
+                flags = int(getattr(edit, "flags", 0))
+                is_bold = bool((flags & 20) or "bold" in font_name.lower())
+                is_italic = bool((flags & 2) or "italic" in font_name.lower())
+                font = get_font(font_name=font_name, font_size=scaled_font_size, is_bold=is_bold, is_italic=is_italic)
+                color_val = getattr(edit, "color", [255, 255, 255])
+                color_tuple = tuple(int(c) for c in color_val[:3]) if isinstance(color_val, (list, tuple)) else (255, 255, 255)
+                draw.text((ox, oy), new_text, fill=color_tuple, font=font)
+
+        dominant_color = get_dominant_color(pil_bg)
         
-        # Resize to max 1200px
+        # Resize to max 1200px while maintaining aspect ratio
         max_width = 1200
-        if pil_image.width > max_width:
-            ratio = max_width / pil_image.width
-            new_height = int(pil_image.height * ratio)
-            pil_image = pil_image.resize((max_width, new_height), Image.Resampling.LANCZOS)
+        if pil_bg.width > max_width:
+            ratio = max_width / pil_bg.width
+            new_height = int(pil_bg.height * ratio)
+            pil_bg = pil_bg.resize((max_width, new_height), Image.Resampling.LANCZOS)
             
         img_buffer = io.BytesIO()
-        pil_image.save(img_buffer, format="JPEG", quality=92, optimize=True)
+        pil_bg.save(img_buffer, format="JPEG", quality=92, optimize=True)
         img_buffer.seek(0)
         
         img_base64 = base64.b64encode(img_buffer.getvalue()).decode()
@@ -520,8 +589,8 @@ async def edit_pdf_text(request: PDFEditRequest):
             "pdf_data": pdf_out_base64,
             "dominant_color": dominant_color,
             "image_size": {
-                "width": pil_image.width,
-                "height": pil_image.height
+                "width": pil_bg.width,
+                "height": pil_bg.height
             }
         })
     except Exception as e:
