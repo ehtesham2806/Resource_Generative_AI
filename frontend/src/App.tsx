@@ -89,6 +89,7 @@ function App() {
   const [isApplyingEdits, setIsApplyingEdits] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTextVal, setEditingTextVal] = useState<string>('');
+  const [editingFontSize, setEditingFontSize] = useState<number>(14);
   const [dominantColor, setDominantColor] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [fileName, setFileName] = useState<string>('');
@@ -427,6 +428,47 @@ function App() {
       setError(err.message || 'Error applying edits');
     } finally {
       setIsApplyingEdits(false);
+    }
+  };
+
+  const handleUpdateBlockFontSize = (itemId: string, deltaOrExact: number, isExact = false) => {
+    const item = displayedItems.find((it: any) => it.id === itemId);
+    if (!item) return;
+    const existingEdit = activeEdits.find(e => e.id === itemId);
+    const currentSize = existingEdit?.font_size || item.font_size || 14;
+    const newSize = isExact ? Math.max(6, deltaOrExact) : Math.max(6, Math.round(currentSize + deltaOrExact));
+    
+    const updatedEdits = activeEdits.filter(e => e.id !== itemId);
+    if (isNativePdf) {
+      updatedEdits.push({
+        id: item.id,
+        pdf_rect: existingEdit?.pdf_rect || item.pdf_rect,
+        action: existingEdit?.action || 'replace',
+        new_text: existingEdit?.new_text !== undefined ? existingEdit.new_text : item.text,
+        original_text: item.text,
+        font_size: newSize,
+        font_name: existingEdit?.font_name || item.font_name,
+        color: existingEdit?.color || item.color,
+        flags: item.flags,
+        rel_box: existingEdit?.rel_box || item.rel_box
+      });
+    } else {
+      updatedEdits.push({
+        id: item.id,
+        box: existingEdit?.box || item.box,
+        action: existingEdit?.action || 'replace',
+        new_text: existingEdit?.new_text !== undefined ? existingEdit.new_text : item.text,
+        original_text: item.text,
+        angle: item.angle,
+        color: existingEdit?.color || item.color,
+        width: item.width,
+        height: item.height,
+        font_size: newSize
+      });
+    }
+    setActiveEdits(updatedEdits);
+    if (editingId === itemId) {
+      setEditingFontSize(newSize);
     }
   };
 
@@ -2933,23 +2975,54 @@ function App() {
                               <span className="absolute -bottom-1.5 -left-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
                               <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
                               <span className="absolute -bottom-1.5 -right-1.5 w-2.5 h-2.5 bg-sky-500 border border-white rounded-full pointer-events-none"></span>
-
+                              
                               {/* Floating Action Menu below selected box */}
                               <div 
-                                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-40 bg-white dark:bg-[#121226] border border-slate-300 dark:border-[#2b2b54] shadow-2xl rounded-xl px-2 py-1.5 flex items-center space-x-2 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
+                                className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-40 bg-white dark:bg-[#121226] border border-slate-300 dark:border-[#2b2b54] shadow-2xl rounded-xl px-2.5 py-1.5 flex items-center space-x-2 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto"
                                 onClick={(ev) => ev.stopPropagation()}
                               >
+                                {/* Edit text button */}
                                 <button
                                   onClick={() => {
                                     setEditingId(item.id);
                                     setEditingTextVal(isEdited ? edit.new_text : item.text);
+                                    setEditingFontSize(edit?.font_size || item.font_size || 14);
                                   }}
-                                  className="p-1 text-slate-700 dark:text-slate-200 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg transition-all"
+                                  className="p-1 text-slate-700 dark:text-slate-200 hover:text-sky-500 hover:bg-sky-50 dark:hover:bg-sky-950/40 rounded-lg transition-all flex items-center gap-1 text-[11px] font-semibold"
                                   title="Edit text content"
                                 >
-                                  <Pencil className="w-4 h-4 text-sky-500" />
+                                  <Pencil className="w-3.5 h-3.5 text-sky-500" />
+                                  <span>Edit</span>
                                 </button>
+
                                 <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700"></div>
+
+                                {/* Font Size Stepper Controls */}
+                                <div className="flex items-center gap-1 bg-slate-100 dark:bg-[#1b1b38] px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/60" title="Adjust font size">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateBlockFontSize(item.id, -2)}
+                                    className="w-4 h-4 rounded hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300"
+                                    title="Decrease font size"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="text-[11px] font-mono font-bold text-sky-500 dark:text-sky-400 min-w-[22px] text-center">
+                                    {Math.round(edit?.font_size || item.font_size || 14)}pt
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateBlockFontSize(item.id, 2)}
+                                    className="w-4 h-4 rounded hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300"
+                                    title="Increase font size"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+
+                                <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700"></div>
+
+                                {/* Delete / Restore button */}
                                 <button
                                   onClick={() => {
                                     const exists = activeEdits.find(e => e.id === item.id);
@@ -2957,15 +3030,24 @@ function App() {
                                       setActiveEdits(activeEdits.filter(e => e.id !== item.id));
                                     } else {
                                       const updated = activeEdits.filter(e => e.id !== item.id);
-                                      updated.push({
-                                        id: item.id,
-                                        pdf_rect: item.pdf_rect,
-                                        action: 'remove',
-                                        original_text: item.text,
-                                        font_size: item.font_size,
-                                        font_name: item.font_name,
-                                        color: item.color
-                                      });
+                                      if (isNativePdf) {
+                                        updated.push({
+                                          id: item.id,
+                                          pdf_rect: item.pdf_rect,
+                                          action: 'remove',
+                                          original_text: item.text,
+                                          font_size: item.font_size,
+                                          font_name: item.font_name,
+                                          color: item.color
+                                        });
+                                      } else {
+                                        updated.push({
+                                          id: item.id,
+                                          box: item.box,
+                                          action: 'remove',
+                                          original_text: item.text
+                                        });
+                                      }
                                       setActiveEdits(updated);
                                     }
                                   }}
@@ -3002,7 +3084,7 @@ function App() {
                                         action: 'replace',
                                         new_text: editingTextVal,
                                         original_text: item.text,
-                                        font_size: item.font_size,
+                                        font_size: editingFontSize || item.font_size,
                                         font_name: item.font_name,
                                         color: item.color
                                       });
@@ -3016,7 +3098,8 @@ function App() {
                                         angle: item.angle,
                                         color: item.color,
                                         width: item.width,
-                                        height: item.height
+                                        height: item.height,
+                                        font_size: editingFontSize || item.font_size
                                       });
                                     }
                                     setActiveEdits(updatedEdits);
@@ -3040,10 +3123,10 @@ function App() {
                   </div>
                   <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-2 text-center">
                     {isNativePdf 
-                      ? 'Click on any text box to reveal Edit & Delete options, or double-click to edit directly.'
+                      ? 'Click on any text box to adjust font size, edit text, or delete.'
                       : (!isNativePdf && ocrStatus === 'scanning')
                       ? 'AI is analyzing text regions in the background. Detected boxes will appear shortly.' 
-                      : 'Click any box on Page 1 or from the list to select, edit, or delete.'}
+                      : 'Click any box on Page 1 or from the list to select, edit font size, or delete.'}
                   </p>
                 </div>
                 
@@ -3110,18 +3193,76 @@ function App() {
                         const edit = activeEdits.find(e => e.id === item.id);
                         const isRemoved = edit?.action === 'remove';
                         const isEdited = edit?.action === 'replace';
+                        const currentSize = edit?.font_size || item.font_size || 14;
                         
                         if (editingId === item.id) {
                           return (
-                            <div key={item.id} className="flex flex-col gap-1.5 p-2.5 rounded-xl bg-indigo-50/50 dark:bg-[#1a1a36] border border-indigo-200 dark:border-indigo-850">
-                              <span className="text-[10px] text-slate-500 font-semibold uppercase">Edit Text content</span>
+                            <div key={item.id} className="flex flex-col gap-2 p-3 rounded-xl bg-indigo-50/80 dark:bg-[#1a1a36] border-2 border-indigo-500/40 dark:border-indigo-600/50 shadow-md">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wider">Edit Text Block</span>
+                                <span className="text-[10px] text-slate-400 font-mono">ID: {item.id}</span>
+                              </div>
                               <input 
                                 type="text" 
                                 value={editingTextVal} 
                                 onChange={(e) => setEditingTextVal(e.target.value)} 
-                                className="premium-input text-xs w-full py-1 px-2"
+                                className="premium-input text-xs w-full py-1.5 px-2.5 font-medium rounded-lg"
+                                placeholder="Text content..."
                                 autoFocus
                               />
+                              
+                              {/* Font Size Controls */}
+                              <div className="flex items-center justify-between bg-white dark:bg-[#121226] p-2 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                                <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Font Size:</span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingFontSize(prev => Math.max(6, prev - 2))}
+                                    className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200"
+                                    title="Decrease font size"
+                                  >
+                                    -
+                                  </button>
+                                  <div className="flex items-center">
+                                    <input
+                                      type="number"
+                                      value={Math.round(editingFontSize)}
+                                      onChange={(e) => setEditingFontSize(Math.max(6, Number(e.target.value) || 6))}
+                                      className="w-10 text-center text-xs font-bold font-mono bg-transparent text-indigo-600 dark:text-indigo-400 focus:outline-none"
+                                      min={6}
+                                      max={120}
+                                    />
+                                    <span className="text-[10px] text-slate-400 font-mono">pt</span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingFontSize(prev => Math.min(120, prev + 2))}
+                                    className="w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200"
+                                    title="Increase font size"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Quick Font Size Presets */}
+                              <div className="flex items-center gap-1 overflow-x-auto py-0.5 scrollbar-none">
+                                {[10, 14, 18, 24, 32, 48, 64].map((size) => (
+                                  <button
+                                    key={size}
+                                    type="button"
+                                    onClick={() => setEditingFontSize(size)}
+                                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold transition-all ${
+                                      Math.round(editingFontSize) === size
+                                        ? 'bg-indigo-600 text-white shadow-sm'
+                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                    }`}
+                                  >
+                                    {size}pt
+                                  </button>
+                                ))}
+                              </div>
+
                               <div className="flex items-center space-x-1.5 justify-end mt-1">
                                 <button 
                                   onClick={() => {
@@ -3133,9 +3274,11 @@ function App() {
                                         action: 'replace',
                                         new_text: editingTextVal,
                                         original_text: item.text,
-                                        font_size: item.font_size,
+                                        font_size: editingFontSize,
                                         font_name: item.font_name,
-                                        color: item.color
+                                        color: item.color,
+                                        flags: item.flags,
+                                        rel_box: item.rel_box
                                       });
                                     } else {
                                       updatedEdits.push({
@@ -3147,19 +3290,20 @@ function App() {
                                         angle: item.angle,
                                         color: item.color,
                                         width: item.width,
-                                        height: item.height
+                                        height: item.height,
+                                        font_size: editingFontSize
                                       });
                                     }
                                     setActiveEdits(updatedEdits);
                                     setEditingId(null);
                                   }}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-[11px] font-bold px-3 py-1 rounded-lg transition-colors shadow-sm"
                                 >
                                   Save
                                 </button>
                                 <button 
                                   onClick={() => setEditingId(null)}
-                                  className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                                  className="bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-350 hover:bg-slate-300 dark:hover:bg-slate-700 text-[11px] font-bold px-3 py-1 rounded-lg transition-colors"
                                 >
                                   Cancel
                                 </button>
@@ -3180,20 +3324,52 @@ function App() {
                               <span className={`text-xs font-medium text-slate-750 dark:text-slate-200 truncate ${isRemoved ? 'line-through opacity-50' : ''}`}>
                                 {isEdited ? edit.new_text : item.text}
                               </span>
-                              {isEdited && (
-                                <span className="text-[9px] text-slate-400 line-through truncate">
-                                  orig: {item.text}
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-mono font-semibold">
+                                  {Math.round(currentSize)}pt
                                 </span>
-                              )}
+                                {isEdited && (
+                                  <span className="text-[9px] text-slate-400 line-through truncate">
+                                    orig: {item.text}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                             <div className="flex items-center space-x-1.5 flex-shrink-0">
+                              {/* Font size - / + buttons right in list item */}
+                              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-0.5 rounded-lg border border-slate-200 dark:border-slate-700/60">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdateBlockFontSize(item.id, -2);
+                                  }}
+                                  className="w-3.5 h-3.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300"
+                                  title="Decrease font size"
+                                >
+                                  -
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleUpdateBlockFontSize(item.id, 2);
+                                  }}
+                                  className="w-3.5 h-3.5 rounded hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300"
+                                  title="Increase font size"
+                                >
+                                  +
+                                </button>
+                              </div>
+
                               <button
                                 onClick={() => {
                                   setEditingId(item.id);
                                   setEditingTextVal(isEdited ? edit.new_text : item.text);
+                                  setEditingFontSize(currentSize);
                                 }}
                                 disabled={isRemoved}
-                                title="Edit text"
+                                title="Edit text and size"
                                 className="p-1 text-slate-400 hover:text-brand dark:hover:text-indigo-400 disabled:opacity-30 disabled:pointer-events-none transition-all hover:scale-110 active:scale-95"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
