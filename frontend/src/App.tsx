@@ -599,9 +599,9 @@ function App() {
     if (fileName) {
       const baseName = fileName.replace(/\.[^/.]+$/, '');
       const scaleSuffix = exportScale > 1 ? `@${exportScale}x` : '';
-      return `${baseName}${scaleSuffix}.png`;
+      return `${baseName}${scaleSuffix}.jpg`;
     }
-    return `${defaultPrefix}-${Date.now()}-${exportScale}x.png`;
+    return `${defaultPrefix}-${Date.now()}-${exportScale}x.jpg`;
   };
 
   // ==============================
@@ -666,7 +666,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('default-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
@@ -741,7 +741,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('laptop-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
@@ -819,7 +819,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('book-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
@@ -894,7 +894,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('phone-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
@@ -969,7 +969,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('tablet-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
@@ -1044,7 +1044,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('webinar-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
@@ -1116,7 +1116,7 @@ function App() {
 
       const link = document.createElement('a');
       link.download = getDownloadFileName('guide-mockup');
-      link.href = finalCanvas.toDataURL('image/png');
+      link.href = finalCanvas.toDataURL('image/jpeg');
 
       document.body.appendChild(link);
       link.click();
