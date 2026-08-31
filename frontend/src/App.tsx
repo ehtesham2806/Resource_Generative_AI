@@ -96,7 +96,7 @@ function App() {
   const [error, setError] = useState<string>('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'upload' | 'canvas' | 'template'>('canvas');
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'upload' | 'canvas' | 'template'>('upload');
   const [templateSearch, setTemplateSearch] = useState<string>('');
   const [templateCategory, setTemplateCategory] = useState<string>('All');
   
