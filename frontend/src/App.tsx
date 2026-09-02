@@ -574,7 +574,13 @@ function App() {
     try {
       setIsDownloading(true);
       const canvas = await htmlToImage.toCanvas(customDesignRef.current, {
+        backgroundColor: undefined,
         pixelRatio: 2 * exportScale,
+        style: {
+          border: 'none',
+          outline: 'none',
+          boxShadow: 'none',
+        },
         filter: (element) =>
           !(
             element instanceof HTMLElement &&
@@ -583,9 +589,38 @@ function App() {
               element.classList.contains('custom-selection-border'))
           ),
       });
+
+      const finalCanvas = document.createElement('canvas');
+      finalCanvas.width = outputWidth * exportScale;
+      finalCanvas.height = outputHeight * exportScale;
+
+      const ctx = finalCanvas.getContext('2d');
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+
+        await drawCanvasBackground(ctx, outputWidth * exportScale, outputHeight * exportScale);
+
+        const scaleX = (outputWidth * exportScale) / canvas.width;
+        const scaleY = (outputHeight * exportScale) / canvas.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        const scaledWidth = canvas.width * scale;
+        const scaledHeight = canvas.height * scale;
+
+        const x = (outputWidth * exportScale - scaledWidth) / 2;
+        const y = (outputHeight * exportScale - scaledHeight) / 2;
+
+        ctx.drawImage(canvas, x, y, scaledWidth, scaledHeight);
+      }
+
       const link = document.createElement('a');
       link.download = getDownloadFileName('custom-design');
-      link.href = canvas.toDataURL('image/jpeg', 0.95);
+      link.href = (ctx ? finalCanvas : canvas).toDataURL(
+        backgroundColor === 'transparent' ? 'image/png' : 'image/jpeg',
+        0.95
+      );
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -2796,6 +2831,9 @@ function App() {
                     <Maximize2 className="w-3.5 h-3.5" />
                     <span>Fit</span>
                   </button>
+
+                  {/* Position button slot - right side of Fit button */}
+                  <div id="custom-design-position-slot" />
                 </div>
 
                 <div className="flex items-stretch relative" ref={bottomScaleDropdownRef}>

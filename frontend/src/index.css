@@ -89,7 +89,7 @@
   }
   .custom-color-button span { @apply h-4 w-4 rounded border border-slate-300 dark:border-slate-600; }
   .custom-color-button input { @apply absolute inset-0 h-full w-full cursor-pointer opacity-0; }
-  .custom-selected-element { @apply z-10; }
+  .custom-selected-element { }
   .custom-resize-handle { @apply absolute z-20 rounded-full border-2 border-fuchsia-500 bg-white shadow-sm dark:bg-slate-900; }
   .custom-resize-nw { @apply -left-1.5 -top-1.5 h-3 w-3 cursor-nwse-resize; }
   .custom-resize-n { @apply -top-1.5 left-1/2 h-3.5 w-1.5 -translate-x-1/2 cursor-ns-resize rounded; }

@@ -4,6 +4,8 @@ import {
   AlignCenter,
   AlignLeft,
   AlignRight,
+  ArrowDown,
+  ArrowUp,
   Bold,
   Check,
   ChevronDown,
@@ -12,8 +14,12 @@ import {
   Eye,
   EyeOff,
   FlipHorizontal,
+  GripVertical,
   Italic,
+  Layers,
   List,
+  MoreVertical,
+  Move,
   MoveHorizontal,
   Plus,
   Search,
@@ -218,7 +224,20 @@ const TextLayerSpan = ({ layer, isEditing, onUpdateText, onBlur }: TextLayerSpan
 const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
   ({ imageUrl, backgroundColor, backgroundImage, outputWidth, outputHeight, isLoading, toolbarSlot }, ref) => {
     const [layers, setLayers] = useState<DesignLayer[]>(() => (imageUrl ? [sourceLayer(imageUrl)] : []));
-    const [selectedId, setSelectedId] = useState<string | null>(imageUrl ? 'source-image' : null);
+    const [selectedIds, setSelectedIds] = useState<string[]>(() => (imageUrl ? ['source-image'] : []));
+    const selectedId = selectedIds[selectedIds.length - 1] || null;
+    const setSelectedId = (id: string | null) => setSelectedIds(id ? [id] : []);
+    const toggleSelectId = (id: string) => {
+      setSelectedIds((current) =>
+        current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+      );
+    };
+    const [marqueeBox, setMarqueeBox] = useState<{
+      startX: number;
+      startY: number;
+      currentX: number;
+      currentY: number;
+    } | null>(null);
     const [hideSourceImage, setHideSourceImage] = useState(false);
     const [availableFonts, setAvailableFonts] = useState<string[]>(DEFAULT_SYSTEM_AND_WEB_FONTS);
     const [isFontOpen, setIsFontOpen] = useState(false);
@@ -228,21 +247,44 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
     const [isStrokeOpen, setIsStrokeOpen] = useState(false);
     const [isRadiusOpen, setIsRadiusOpen] = useState(false);
     const [isShapeMenuOpen, setIsShapeMenuOpen] = useState(false);
+    const [isPositionOpen, setIsPositionOpen] = useState(false);
+    const [activeLayerMenuId, setActiveLayerMenuId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [past, setPast] = useState<DesignLayer[][]>([]);
     const [future, setFuture] = useState<DesignLayer[][]>([]);
+    const [dragAngleInfo, setDragAngleInfo] = useState<{ x: number; y: number; label: string } | null>(null);
+    const [activeGuides, setActiveGuides] = useState<Array<{ type: 'vertical' | 'horizontal'; position: number }>>([]);
     const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(() =>
       typeof document !== 'undefined' ? document.getElementById('custom-design-toolbar-slot') : null
+    );
+    const [positionPortalTarget, setPositionPortalTarget] = useState<HTMLElement | null>(() =>
+      typeof document !== 'undefined' ? document.getElementById('custom-design-position-slot') : null
     );
 
     const fontMenuRef = useRef<HTMLDivElement>(null);
     const shapeMenuRef = useRef<HTMLDivElement>(null);
+    const positionMenuRef = useRef<HTMLDivElement>(null);
     const opacityMenuRef = useRef<HTMLDivElement>(null);
     const strokeMenuRef = useRef<HTMLDivElement>(null);
     const radiusMenuRef = useRef<HTMLDivElement>(null);
-    const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef<{
+      id: string;
+      startX: number;
+      startY: number;
+      clientStartX: number;
+      clientStartY: number;
+      offsetX: number;
+      offsetY: number;
+      lockedAxis?: 'horizontal' | 'vertical' | null;
+      actualWidth?: number;
+      actualHeight?: number;
+      initialPositions?: Record<string, { x: number; y: number }>;
+      isAltDuplicate?: boolean;
+    } | null>(null);
     const dragStartSnapshotRef = useRef<DesignLayer[] | null>(null);
     const textEditStartSnapshotRef = useRef<DesignLayer[] | null>(null);
+    const hasDraggedRef = useRef(false);
     const resizeRef = useRef<{
       id: string;
       corner: string;
@@ -256,7 +298,62 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       startFontSize?: number;
       startWidth?: number;
       isUniformShape?: boolean;
+      isMulti?: boolean;
+      groupMinX?: number;
+      groupMinY?: number;
+      groupWidth?: number;
+      groupHeight?: number;
+      initialLayers?: Array<{
+        id: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+        type: LayerType;
+        fontSize?: number;
+      }>;
     } | null>(null);
+
+    const moveLayer = (id: string, direction: 'front' | 'back' | 'forward' | 'backward') => {
+      const index = layers.findIndex((l) => l.id === id);
+      if (index === -1) return;
+
+      pushHistory(layers);
+
+      const newLayers = [...layers];
+      const [item] = newLayers.splice(index, 1);
+
+      if (direction === 'front') {
+        newLayers.push(item);
+      } else if (direction === 'back') {
+        newLayers.unshift(item);
+      } else if (direction === 'forward') {
+        const targetIndex = Math.min(newLayers.length, index + 1);
+        newLayers.splice(targetIndex, 0, item);
+      } else if (direction === 'backward') {
+        const targetIndex = Math.max(0, index - 1);
+        newLayers.splice(targetIndex, 0, item);
+      }
+
+      setLayers(newLayers);
+      setSelectedId(id);
+    };
+
+    const reorderLayers = (draggedId: string, targetId: string) => {
+      if (draggedId === targetId) return;
+      const draggedIndex = layers.findIndex((l) => l.id === draggedId);
+      const targetIndex = layers.findIndex((l) => l.id === targetId);
+      if (draggedIndex === -1 || targetIndex === -1) return;
+
+      pushHistory(layers);
+
+      const newLayers = [...layers];
+      const [item] = newLayers.splice(draggedIndex, 1);
+      newLayers.splice(targetIndex, 0, item);
+
+      setLayers(newLayers);
+      setSelectedId(draggedId);
+    };
 
     const scanSystemFonts = async () => {
       let combined = [...DEFAULT_SYSTEM_AND_WEB_FONTS];
@@ -319,20 +416,55 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       setLayers(next);
     };
 
-    const deleteSelected = () => {
-      if (!selectedId) return;
+    const duplicateSelected = () => {
+      if (selectedIds.length === 0) return;
       pushHistory(layers);
-      setLayers((current) => current.filter((layer) => layer.id !== selectedId));
-      setSelectedId(null);
+
+      const newIds: string[] = [];
+      const clonedLayers: DesignLayer[] = [];
+
+      layers.forEach((layer) => {
+        if (selectedIds.includes(layer.id)) {
+          const newId = `${layer.type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+          newIds.push(newId);
+          clonedLayers.push({
+            ...layer,
+            id: newId,
+            x: layer.x + 3,
+            y: layer.y + 3,
+          });
+        }
+      });
+
+      if (clonedLayers.length > 0) {
+        setLayers((current) => [...current, ...clonedLayers]);
+        setSelectedIds(newIds);
+      }
+    };
+
+    const deleteSelected = () => {
+      if (selectedIds.length === 0) return;
+      pushHistory(layers);
+      setLayers((current) => current.filter((layer) => !selectedIds.includes(layer.id)));
+      setSelectedIds([]);
       setEditingId(null);
     };
 
     // Sync portal target with slot or DOM element
     useEffect(() => {
-      const target = toolbarSlot || document.getElementById('custom-design-toolbar-slot');
-      if (target) {
-        setPortalTarget(target);
-      }
+      const updateSlots = () => {
+        const target = toolbarSlot || document.getElementById('custom-design-toolbar-slot');
+        if (target) {
+          setPortalTarget(target);
+        }
+        const posTarget = document.getElementById('custom-design-position-slot');
+        if (posTarget) {
+          setPositionPortalTarget(posTarget);
+        }
+      };
+      updateSlots();
+      const timer = setTimeout(updateSlots, 50);
+      return () => clearTimeout(timer);
     }, [toolbarSlot]);
 
     // Close popups on outside click
@@ -354,13 +486,17 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         if (shapeMenuRef.current && !shapeMenuRef.current.contains(target)) {
           setIsShapeMenuOpen(false);
         }
+        if (positionMenuRef.current && !positionMenuRef.current.contains(target)) {
+          setIsPositionOpen(false);
+          setActiveLayerMenuId(null);
+        }
       };
 
-      if (isFontOpen || isOpacityOpen || isStrokeOpen || isRadiusOpen || isShapeMenuOpen) {
+      if (isFontOpen || isOpacityOpen || isStrokeOpen || isRadiusOpen || isShapeMenuOpen || isPositionOpen) {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }
-    }, [isFontOpen, isOpacityOpen, isStrokeOpen, isRadiusOpen, isShapeMenuOpen]);
+    }, [isFontOpen, isOpacityOpen, isStrokeOpen, isRadiusOpen, isShapeMenuOpen, isPositionOpen]);
 
     useEffect(() => {
       setLayers((current) => {
@@ -394,9 +530,9 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       pushHistory(layers);
       const id = `shape-${shapeType}-${Date.now()}`;
       const isSquareShape = shapeType === 'circle' || shapeType === 'triangle' || shapeType === 'star';
-      // On 1200 x 800 (1.5 ratio), 24% width = 288px, 36% height = 288px! Perfectly 1:1 square!
+      const canvasRatio = outputWidth / outputHeight;
       const width = isSquareShape ? 24 : 32;
-      const height = isSquareShape ? 36 : 24;
+      const height = isSquareShape ? 24 * canvasRatio : 24;
 
       const layer: DesignLayer = {
         id,
@@ -406,7 +542,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         y: 24,
         width,
         height,
-        fill: '#f97316',
+        fill: '#9333ea',
         radius: 0, // Requirement 3: default radius 0 for rectangle
         opacity: 100,
         stroke: '#7c3aed',
@@ -467,21 +603,115 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
     const pointerDown = (event: React.PointerEvent, layer: DesignLayer) => {
       event.stopPropagation();
-      const canvas = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
+      const canvas = canvasRef.current?.getBoundingClientRect() || (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
       if (!canvas) return;
+
+      hasDraggedRef.current = false;
+
+      const isMultiSelectKey = event.shiftKey || event.ctrlKey || event.metaKey;
+      const isAltDuplicate = event.altKey;
+
+      let activeSelection = selectedIds;
+
+      if (isMultiSelectKey) {
+        if (selectedIds.includes(layer.id)) {
+          activeSelection = selectedIds.filter((id) => id !== layer.id);
+          setSelectedIds(activeSelection);
+        } else {
+          activeSelection = [...selectedIds, layer.id];
+          setSelectedIds(activeSelection);
+        }
+      } else {
+        if (!selectedIds.includes(layer.id)) {
+          activeSelection = [layer.id];
+          setSelectedIds(activeSelection);
+        }
+      }
+
       dragStartSnapshotRef.current = layers;
+
+      const targetElem = event.currentTarget as HTMLElement;
+      const elemRect = targetElem.getBoundingClientRect();
+      const actualWidth = (elemRect.width / canvas.width) * 100;
+      const actualHeight = (elemRect.height / canvas.height) * 100;
+
+      // Handle Alt + Drag to Duplicate
+      if (isAltDuplicate) {
+        event.preventDefault();
+        pushHistory(layers);
+
+        const targetsToClone = activeSelection.length > 0 ? activeSelection : [layer.id];
+        const newIds: string[] = [];
+        const clonedLayers: DesignLayer[] = [];
+        const layerStartPos: Record<string, { x: number; y: number }> = {};
+        let leadCloneId = '';
+
+        layers.forEach((l) => {
+          if (targetsToClone.includes(l.id)) {
+            const newId = `${l.type}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+            newIds.push(newId);
+            if (l.id === layer.id) leadCloneId = newId;
+            clonedLayers.push({
+              ...l,
+              id: newId,
+            });
+            layerStartPos[newId] = { x: l.x, y: l.y };
+          }
+        });
+
+        setLayers((current) => [...current, ...clonedLayers]);
+        setSelectedIds(newIds);
+
+        dragRef.current = {
+          id: leadCloneId || newIds[0] || layer.id,
+          startX: layer.x,
+          startY: layer.y,
+          clientStartX: event.clientX,
+          clientStartY: event.clientY,
+          offsetX: event.clientX - (canvas.left + (layer.x / 100) * canvas.width),
+          offsetY: event.clientY - (canvas.top + (layer.y / 100) * canvas.height),
+          lockedAxis: null,
+          actualWidth,
+          actualHeight,
+          initialPositions: layerStartPos,
+          isAltDuplicate: true,
+        };
+
+        targetElem.setPointerCapture(event.pointerId);
+        return;
+      }
+
+      // Normal drag
+      const layerStartPos: Record<string, { x: number; y: number }> = {};
+      layers.forEach((l) => {
+        if (activeSelection.includes(l.id)) {
+          layerStartPos[l.id] = { x: l.x, y: l.y };
+        }
+      });
+      if (!layerStartPos[layer.id]) {
+        layerStartPos[layer.id] = { x: layer.x, y: layer.y };
+      }
+
       dragRef.current = {
         id: layer.id,
+        startX: layer.x,
+        startY: layer.y,
+        clientStartX: event.clientX,
+        clientStartY: event.clientY,
         offsetX: event.clientX - (canvas.left + (layer.x / 100) * canvas.width),
         offsetY: event.clientY - (canvas.top + (layer.y / 100) * canvas.height),
+        lockedAxis: null,
+        actualWidth,
+        actualHeight,
+        initialPositions: layerStartPos,
       };
-      setSelectedId(layer.id);
-      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+
+      targetElem.setPointerCapture(event.pointerId);
     };
 
     const resizeStart = (event: React.PointerEvent, layer: DesignLayer, corner: string) => {
       event.stopPropagation();
-      const canvas = (event.currentTarget as HTMLElement).parentElement?.parentElement?.getBoundingClientRect();
+      const canvas = canvasRef.current?.getBoundingClientRect() || (event.currentTarget as HTMLElement).closest('.mockup-canvas-container')?.getBoundingClientRect();
       if (!canvas) return;
       dragStartSnapshotRef.current = layers;
       const isUniformShape =
@@ -505,26 +735,365 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     };
 
+    const multiResizeStart = (event: React.PointerEvent, corner: string) => {
+      event.stopPropagation();
+      const canvas =
+        canvasRef.current?.getBoundingClientRect() ||
+        (event.currentTarget as HTMLElement).closest('.mockup-canvas-container')?.getBoundingClientRect();
+      if (!canvas) return;
+      dragStartSnapshotRef.current = layers;
+
+      const selectedLayers = layers.filter((l) => selectedIds.includes(l.id));
+      if (selectedLayers.length === 0) return;
+
+      const groupMinX = Math.min(...selectedLayers.map((l) => l.x));
+      const groupMinY = Math.min(...selectedLayers.map((l) => l.y));
+      const groupMaxX = Math.max(...selectedLayers.map((l) => l.x + l.width));
+      const groupMaxY = Math.max(...selectedLayers.map((l) => l.y + l.height));
+      const groupWidth = groupMaxX - groupMinX;
+      const groupHeight = groupMaxY - groupMinY;
+
+      resizeRef.current = {
+        id: 'multi',
+        isMulti: true,
+        corner,
+        startX: event.clientX,
+        startY: event.clientY,
+        x: groupMinX,
+        y: groupMinY,
+        width: groupWidth,
+        height: groupHeight,
+        groupMinX,
+        groupMinY,
+        groupWidth,
+        groupHeight,
+        initialLayers: selectedLayers.map((l) => ({
+          id: l.id,
+          x: l.x,
+          y: l.y,
+          width: l.width,
+          height: l.height,
+          type: l.type,
+          fontSize: l.fontSize || 34,
+        })),
+      };
+
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    };
+
     const pointerMove = (event: React.PointerEvent) => {
       const canvas = event.currentTarget.getBoundingClientRect();
+
+      if (marqueeBox) {
+        const curX = Math.max(0, Math.min(100, ((event.clientX - canvas.left) / canvas.width) * 100));
+        const curY = Math.max(0, Math.min(100, ((event.clientY - canvas.top) / canvas.height) * 100));
+
+        setMarqueeBox((prev) => (prev ? { ...prev, currentX: curX, currentY: curY } : null));
+
+        const minX = Math.min(marqueeBox.startX, curX);
+        const maxX = Math.max(marqueeBox.startX, curX);
+        const minY = Math.min(marqueeBox.startY, curY);
+        const maxY = Math.max(marqueeBox.startY, curY);
+
+        const intersectedIds: string[] = [];
+        layers.forEach((l) => {
+          if (l.id === 'source-image' && hideSourceImage) return;
+          const lLeft = l.x;
+          const lRight = l.x + l.width;
+          const lTop = l.y;
+          const lBottom = l.y + l.height;
+
+          // Check if layer overlaps with marquee rectangle
+          if (lLeft < maxX && lRight > minX && lTop < maxY && lBottom > minY) {
+            intersectedIds.push(l.id);
+          }
+        });
+
+        setSelectedIds(intersectedIds);
+        return;
+      }
+
       if (dragRef.current) {
         const drag = dragRef.current;
+        let pixelDx = event.clientX - drag.clientStartX;
+        let pixelDy = event.clientY - drag.clientStartY;
+
+        if (Math.hypot(pixelDx, pixelDy) >= 2) {
+          hasDraggedRef.current = true;
+        }
+
+        if (event.shiftKey) {
+          // Lock axis once user starts moving (> 2px) so it never automatically changes mid-drag
+          if (!drag.lockedAxis && Math.hypot(pixelDx, pixelDy) >= 2) {
+            drag.lockedAxis = Math.abs(pixelDx) >= Math.abs(pixelDy) ? 'horizontal' : 'vertical';
+          }
+
+          const isHorizontal = drag.lockedAxis ? drag.lockedAxis === 'horizontal' : Math.abs(pixelDx) >= Math.abs(pixelDy);
+
+          if (isHorizontal) {
+            // Lock vertical movement completely: move strictly horizontally at 0°
+            pixelDy = 0;
+            setDragAngleInfo({
+              x: event.clientX - canvas.left,
+              y: event.clientY - canvas.top,
+              label: '0°',
+            });
+          } else {
+            // Lock horizontal movement completely: move strictly vertically at 90°
+            pixelDx = 0;
+            setDragAngleInfo({
+              x: event.clientX - canvas.left,
+              y: event.clientY - canvas.top,
+              label: '90°',
+            });
+          }
+        } else {
+          drag.lockedAxis = null;
+          setDragAngleInfo(null);
+        }
+
+        const curLayer = layers.find((l) => l.id === drag.id);
+        let nextX = drag.startX + (pixelDx / canvas.width) * 100;
+        let nextY = drag.startY + (pixelDy / canvas.height) * 100;
+
+        const newGuides: Array<{ type: 'vertical' | 'horizontal'; position: number }> = [];
+
+        if (curLayer) {
+          const layerWidth = drag.actualWidth || curLayer.width;
+          const layerHeight = drag.actualHeight || curLayer.height;
+
+          // Snapping threshold: 10 pixels for responsive magnetic feel
+          const snapThresholdPx = 10;
+          const snapThreshX = (snapThresholdPx / canvas.width) * 100;
+          const snapThreshY = (snapThresholdPx / canvas.height) * 100;
+
+          // --- X-AXIS SNAPPING (Center & Corners/Sides) ---
+          const elementCenterX = nextX + layerWidth / 2;
+          const elementLeft = nextX;
+          const elementRight = nextX + layerWidth;
+
+          // 1. Center of element to Center of Canvas (50%)
+          if (Math.abs(elementCenterX - 50) <= snapThreshX) {
+            nextX = 50 - layerWidth / 2;
+            newGuides.push({ type: 'vertical', position: 50 });
+          }
+          // 2. Left of element to Canvas Left (0%)
+          else if (Math.abs(elementLeft - 0) <= snapThreshX) {
+            nextX = 0;
+            newGuides.push({ type: 'vertical', position: 0 });
+          }
+          // 3. Right of element to Canvas Right (100%)
+          else if (Math.abs(elementRight - 100) <= snapThreshX) {
+            nextX = 100 - layerWidth;
+            newGuides.push({ type: 'vertical', position: 100 });
+          }
+          // 4. Right of element to Canvas Center (50%)
+          else if (Math.abs(elementRight - 50) <= snapThreshX) {
+            nextX = 50 - layerWidth;
+            newGuides.push({ type: 'vertical', position: 50 });
+          }
+          // 5. Left of element to Canvas Center (50%)
+          else if (Math.abs(elementLeft - 50) <= snapThreshX) {
+            nextX = 50;
+            newGuides.push({ type: 'vertical', position: 50 });
+          } else {
+            // Check other layers on canvas
+            for (const other of layers) {
+              if (other.id === drag.id) continue;
+              const otherCenterX = other.x + other.width / 2;
+              if (Math.abs(elementCenterX - otherCenterX) <= snapThreshX) {
+                nextX = otherCenterX - layerWidth / 2;
+                newGuides.push({ type: 'vertical', position: otherCenterX });
+                break;
+              } else if (Math.abs(elementLeft - other.x) <= snapThreshX) {
+                nextX = other.x;
+                newGuides.push({ type: 'vertical', position: other.x });
+                break;
+              } else if (Math.abs(elementRight - (other.x + other.width)) <= snapThreshX) {
+                nextX = other.x + other.width - layerWidth;
+                newGuides.push({ type: 'vertical', position: other.x + other.width });
+                break;
+              }
+            }
+          }
+
+          // --- Y-AXIS SNAPPING (Center & Corners/Sides) ---
+          const elementCenterY = nextY + layerHeight / 2;
+          const elementTop = nextY;
+          const elementBottom = nextY + layerHeight;
+
+          // 1. Center of element to Center of Canvas (50%)
+          if (Math.abs(elementCenterY - 50) <= snapThreshY) {
+            nextY = 50 - layerHeight / 2;
+            newGuides.push({ type: 'horizontal', position: 50 });
+          }
+          // 2. Top of element to Canvas Top (0%)
+          else if (Math.abs(elementTop - 0) <= snapThreshY) {
+            nextY = 0;
+            newGuides.push({ type: 'horizontal', position: 0 });
+          }
+          // 3. Bottom of element to Canvas Bottom (100%)
+          else if (Math.abs(elementBottom - 100) <= snapThreshY) {
+            nextY = 100 - layerHeight;
+            newGuides.push({ type: 'horizontal', position: 100 });
+          }
+          // 4. Bottom of element to Canvas Center (50%)
+          else if (Math.abs(elementBottom - 50) <= snapThreshY) {
+            nextY = 50 - layerHeight;
+            newGuides.push({ type: 'horizontal', position: 50 });
+          }
+          // 5. Top of element to Canvas Center (50%)
+          else if (Math.abs(elementTop - 50) <= snapThreshY) {
+            nextY = 50;
+            newGuides.push({ type: 'horizontal', position: 50 });
+          } else {
+            // Check other layers on canvas
+            for (const other of layers) {
+              if (other.id === drag.id) continue;
+              const otherCenterY = other.y + other.height / 2;
+              if (Math.abs(elementCenterY - otherCenterY) <= snapThreshY) {
+                nextY = otherCenterY - layerHeight / 2;
+                newGuides.push({ type: 'horizontal', position: otherCenterY });
+                break;
+              } else if (Math.abs(elementTop - other.y) <= snapThreshY) {
+                nextY = other.y;
+                newGuides.push({ type: 'horizontal', position: other.y });
+                break;
+              } else if (Math.abs(elementBottom - (other.y + other.height)) <= snapThreshY) {
+                nextY = other.y + other.height - layerHeight;
+                newGuides.push({ type: 'horizontal', position: other.y + other.height });
+                break;
+              }
+            }
+          }
+        }
+
+        setActiveGuides(newGuides);
+
+        const deltaX = nextX - drag.startX;
+        const deltaY = nextY - drag.startY;
+
         setLayers((current) =>
-          current.map((layer) =>
-            layer.id === drag.id
-              ? {
-                  ...layer,
-                  x: Math.max(0, Math.min(100 - layer.width, ((event.clientX - canvas.left - drag.offsetX) / canvas.width) * 100)),
-                  y: Math.max(0, Math.min(100 - layer.height, ((event.clientY - canvas.top - drag.offsetY) / canvas.height) * 100)),
-                }
-              : layer
-          )
+          current.map((layer) => {
+            if (drag.initialPositions && drag.initialPositions[layer.id] !== undefined) {
+              const start = drag.initialPositions[layer.id];
+              return {
+                ...layer,
+                x: start.x + deltaX,
+                y: start.y + deltaY,
+              };
+            }
+            if (layer.id === drag.id) {
+              return {
+                ...layer,
+                x: nextX,
+                y: nextY,
+              };
+            }
+            return layer;
+          })
         );
       }
       if (resizeRef.current) {
         const resize = resizeRef.current;
         const deltaX = ((event.clientX - resize.startX) / canvas.width) * 100;
         const deltaY = ((event.clientY - resize.startY) / canvas.height) * 100;
+
+        // 0) Multi-selection resize: left/right handles adjust width, corner handles scale group
+        if (resize.isMulti && resize.initialLayers && resize.groupWidth) {
+          if (resize.corner === 'e') {
+            const newGroupWidth = Math.max(5, resize.groupWidth + deltaX);
+            const scaleX = newGroupWidth / resize.groupWidth;
+
+            setLayers((current) =>
+              current.map((layer) => {
+                const init = resize.initialLayers?.find((l) => l.id === layer.id);
+                if (!init) return layer;
+                const relX = init.x - resize.groupMinX!;
+                const nextX = resize.groupMinX! + relX * scaleX;
+                const nextWidth = Math.max(2, init.width * scaleX);
+                return {
+                  ...layer,
+                  x: nextX,
+                  width: nextWidth,
+                };
+              })
+            );
+            return;
+          }
+
+          if (resize.corner === 'w') {
+            const initialGroupRight = resize.groupMinX! + resize.groupWidth;
+            const newGroupMinX = resize.groupMinX! + deltaX;
+            const newGroupWidth = Math.max(5, initialGroupRight - newGroupMinX);
+            const scaleX = newGroupWidth / resize.groupWidth;
+
+            setLayers((current) =>
+              current.map((layer) => {
+                const init = resize.initialLayers?.find((l) => l.id === layer.id);
+                if (!init) return layer;
+                const relRight = initialGroupRight - (init.x + init.width);
+                const nextWidth = Math.max(2, init.width * scaleX);
+                const nextX = initialGroupRight - relRight * scaleX - nextWidth;
+                return {
+                  ...layer,
+                  x: nextX,
+                  width: nextWidth,
+                };
+              })
+            );
+            return;
+          }
+
+          let scale = 1;
+          const pixelDx = event.clientX - resize.startX;
+          const pixelDy = event.clientY - resize.startY;
+          if (resize.corner === 'se') scale = Math.max(0.1, 1 + (pixelDx + pixelDy) / 200);
+          else if (resize.corner === 'nw') scale = Math.max(0.1, 1 - (pixelDx + pixelDy) / 200);
+          else if (resize.corner === 'ne') scale = Math.max(0.1, 1 + (pixelDx - pixelDy) / 200);
+          else if (resize.corner === 'sw') scale = Math.max(0.1, 1 - (pixelDx - pixelDy) / 200);
+
+          const anchorX = resize.corner.includes('w') ? resize.groupMinX! + resize.groupWidth : resize.groupMinX!;
+          const anchorY = resize.corner.includes('n') ? resize.groupMinY! + resize.groupHeight : resize.groupMinY!;
+
+          setLayers((current) =>
+            current.map((layer) => {
+              const init = resize.initialLayers?.find((l) => l.id === layer.id);
+              if (!init) return layer;
+
+              let nextX = init.x;
+              let nextY = init.y;
+              const nextWidth = Math.max(2, init.width * scale);
+              const nextHeight = Math.max(2, init.height * scale);
+
+              if (resize.corner.includes('w')) {
+                const relDist = anchorX - (init.x + init.width);
+                nextX = anchorX - relDist * scale - nextWidth;
+              } else {
+                const relDist = init.x - anchorX;
+                nextX = anchorX + relDist * scale;
+              }
+
+              if (resize.corner.includes('n')) {
+                const relDist = anchorY - (init.y + init.height);
+                nextY = anchorY - relDist * scale - nextHeight;
+              } else {
+                const relDist = init.y - anchorY;
+                nextY = anchorY + relDist * scale;
+              }
+
+              return {
+                ...layer,
+                x: nextX,
+                y: nextY,
+                width: nextWidth,
+                height: nextHeight,
+                fontSize: init.fontSize ? Math.max(8, Math.round(init.fontSize * scale)) : layer.fontSize,
+              };
+            })
+          );
+          return;
+        }
 
         // 1) Text layer corner drag: scales font size based on dragging towards / opposite to text
         if (resize.isText && ['nw', 'ne', 'sw', 'se'].includes(resize.corner)) {
@@ -533,33 +1102,25 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
           let delta = 0;
           if (resize.corner === 'se') {
-            // Dragging away/opposite to text (down & right): increases font size
-            // Dragging towards text (up & left): decreases font size
             delta = (pixelDeltaX + pixelDeltaY) / 2;
           } else if (resize.corner === 'nw') {
-            // Dragging away/opposite to text (up & left): increases font size
-            // Dragging towards text (down & right): decreases font size
             delta = (-pixelDeltaX - pixelDeltaY) / 2;
           } else if (resize.corner === 'ne') {
-            // Dragging away/opposite to text (up & right): increases font size
-            // Dragging towards text (down & left): decreases font size
             delta = (pixelDeltaX - pixelDeltaY) / 2;
           } else if (resize.corner === 'sw') {
-            // Dragging away/opposite to text (down & left): increases font size
-            // Dragging towards text (up & right): decreases font size
             delta = (-pixelDeltaX + pixelDeltaY) / 2;
           }
 
           // Sensitivity: ~140px drag doubles font size
           const scale = Math.max(0.15, 1 + delta / 140);
           const startFont = resize.startFontSize || 34;
-          const nextFontSize = Math.round(Math.max(8, Math.min(160, startFont * scale)));
+          const nextFontSize = Math.round(Math.max(8, Math.min(240, startFont * scale)));
           const actualScale = nextFontSize / startFont;
-          const nextWidth = Math.max(8, Math.min(95, (resize.startWidth || 30) * actualScale));
+          const nextWidth = Math.max(8, (resize.startWidth || 30) * actualScale);
 
           let nextX = resize.x;
           if (resize.corner.includes('w')) {
-            nextX = Math.max(0, resize.x + resize.width - nextWidth);
+            nextX = resize.x + resize.width - nextWidth;
           }
 
           setLayers((current) =>
@@ -568,41 +1129,55 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
               return {
                 ...layer,
                 x: nextX,
-                width: Math.min(100 - nextX, nextWidth),
+                width: nextWidth,
                 fontSize: nextFontSize,
               };
             })
           );
+          const snapThresholdPx = 10;
+          const snapThreshX = (snapThresholdPx / canvas.width) * 100;
+          const resizeGuides: Array<{ type: 'vertical' | 'horizontal'; position: number }> = [];
+          if (resize.corner.includes('w')) {
+            if (Math.abs(nextX - 0) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 0 });
+            else if (Math.abs(nextX - 50) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 50 });
+          } else {
+            const currentRight = nextX + nextWidth;
+            if (Math.abs(currentRight - 50) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 50 });
+            else if (Math.abs(currentRight - 100) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 100 });
+          }
+          setActiveGuides(resizeGuides);
           return;
         }
 
-        // 2) Circle, Star, Triangle uniform scaling (aspect ratio locked, only size changes)
-        if (resize.isUniformShape && ['nw', 'ne', 'sw', 'se'].includes(resize.corner)) {
+        // 2) Circle, Star, Triangle uniform scaling (aspect ratio strictly locked, always 1:1 square, expandable outside frame)
+        if (resize.isUniformShape) {
           const pixelDeltaX = event.clientX - resize.startX;
           const pixelDeltaY = event.clientY - resize.startY;
+          const canvasRatio = canvas.width / canvas.height;
 
           let delta = 0;
-          if (resize.corner === 'se') {
-            delta = (pixelDeltaX + pixelDeltaY) / 2;
-          } else if (resize.corner === 'nw') {
-            delta = (-pixelDeltaX - pixelDeltaY) / 2;
-          } else if (resize.corner === 'ne') {
-            delta = (pixelDeltaX - pixelDeltaY) / 2;
-          } else if (resize.corner === 'sw') {
-            delta = (-pixelDeltaX + pixelDeltaY) / 2;
-          }
+          if (resize.corner === 'se') delta = (pixelDeltaX + pixelDeltaY) / 2;
+          else if (resize.corner === 'nw') delta = (-pixelDeltaX - pixelDeltaY) / 2;
+          else if (resize.corner === 'ne') delta = (pixelDeltaX - pixelDeltaY) / 2;
+          else if (resize.corner === 'sw') delta = (-pixelDeltaX + pixelDeltaY) / 2;
+          else if (resize.corner === 'e') delta = pixelDeltaX;
+          else if (resize.corner === 'w') delta = -pixelDeltaX;
+          else if (resize.corner === 's') delta = pixelDeltaY;
+          else if (resize.corner === 'n') delta = -pixelDeltaY;
 
-          const scale = Math.max(0.15, 1 + delta / 140);
-          const nextWidth = Math.max(4, Math.min(95, resize.width * scale));
-          const nextHeight = Math.max(4, Math.min(95, resize.height * scale));
+          const scale = Math.max(0.05, 1 + delta / 140);
+          // Scale freely without any artificial 95% cap
+          const nextWidth = Math.max(2, Math.min(500, resize.width * scale));
+          // nextHeight is strictly locked to nextWidth * canvasRatio:
+          const nextHeight = nextWidth * canvasRatio;
 
           let nextX = resize.x;
           let nextY = resize.y;
           if (resize.corner.includes('w')) {
-            nextX = Math.max(0, resize.x + resize.width - nextWidth);
+            nextX = resize.x + resize.width - nextWidth;
           }
           if (resize.corner.includes('n')) {
-            nextY = Math.max(0, resize.y + resize.height - nextHeight);
+            nextY = resize.y + resize.height - nextHeight;
           }
 
           setLayers((current) =>
@@ -618,6 +1193,27 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 : layer
             )
           );
+          const snapThresholdPx = 10;
+          const snapThreshX = (snapThresholdPx / canvas.width) * 100;
+          const snapThreshY = (snapThresholdPx / canvas.height) * 100;
+          const resizeGuides: Array<{ type: 'vertical' | 'horizontal'; position: number }> = [];
+          if (resize.corner.includes('w')) {
+            if (Math.abs(nextX - 0) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 0 });
+            else if (Math.abs(nextX - 50) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 50 });
+          } else if (resize.corner.includes('e')) {
+            const currentRight = nextX + nextWidth;
+            if (Math.abs(currentRight - 50) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 50 });
+            else if (Math.abs(currentRight - 100) <= snapThreshX) resizeGuides.push({ type: 'vertical', position: 100 });
+          }
+          if (resize.corner.includes('n')) {
+            if (Math.abs(nextY - 0) <= snapThreshY) resizeGuides.push({ type: 'horizontal', position: 0 });
+            else if (Math.abs(nextY - 50) <= snapThreshY) resizeGuides.push({ type: 'horizontal', position: 50 });
+          } else if (resize.corner.includes('s')) {
+            const currentBottom = nextY + nextHeight;
+            if (Math.abs(currentBottom - 50) <= snapThreshY) resizeGuides.push({ type: 'horizontal', position: 50 });
+            else if (Math.abs(currentBottom - 100) <= snapThreshY) resizeGuides.push({ type: 'horizontal', position: 100 });
+          }
+          setActiveGuides(resizeGuides);
           return;
         }
 
@@ -627,23 +1223,71 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         const changesWidth = !resize.isUniformShape && (resize.corner.includes('w') || resize.corner.includes('e'));
         const changesHeight = !resize.isText && !resize.isUniformShape && (resize.corner.includes('n') || resize.corner.includes('s'));
 
+        const snapThresholdPx = 8;
+        const snapThreshX = (snapThresholdPx / canvas.width) * 100;
+        const snapThreshY = (snapThresholdPx / canvas.height) * 100;
+        const resizeGuides: Array<{ type: 'vertical' | 'horizontal'; position: number }> = [];
+
         setLayers((current) =>
           current.map((layer) => {
             if (layer.id !== resize.id) return layer;
             const right = resize.x + resize.width;
             const bottom = resize.y + resize.height;
-            const nextX = fromWest ? Math.max(0, Math.min(right - 8, resize.x + deltaX)) : resize.x;
-            const nextY = fromNorth ? Math.max(0, Math.min(bottom - 8, resize.y + deltaY)) : resize.y;
-            const nextWidth = fromWest
+            let nextX = fromWest ? Math.min(right - 4, resize.x + deltaX) : resize.x;
+            let nextY = fromNorth ? Math.min(bottom - 4, resize.y + deltaY) : resize.y;
+            let nextWidth = fromWest
               ? right - nextX
               : changesWidth
-              ? Math.max(8, Math.min(100 - resize.x, resize.width + deltaX))
+              ? Math.max(4, resize.width + deltaX)
               : resize.width;
-            const nextHeight = fromNorth
+            let nextHeight = fromNorth
               ? bottom - nextY
               : changesHeight
-              ? Math.max(8, Math.min(100 - resize.y, resize.height + deltaY))
+              ? Math.max(4, resize.height + deltaY)
               : resize.height;
+
+            if (fromWest) {
+              if (Math.abs(nextX - 0) <= snapThreshX) {
+                nextWidth += nextX;
+                nextX = 0;
+                resizeGuides.push({ type: 'vertical', position: 0 });
+              } else if (Math.abs(nextX - 50) <= snapThreshX) {
+                nextWidth += nextX - 50;
+                nextX = 50;
+                resizeGuides.push({ type: 'vertical', position: 50 });
+              }
+            } else if (changesWidth) {
+              const currentRight = nextX + nextWidth;
+              if (Math.abs(currentRight - 50) <= snapThreshX) {
+                nextWidth = 50 - nextX;
+                resizeGuides.push({ type: 'vertical', position: 50 });
+              } else if (Math.abs(currentRight - 100) <= snapThreshX) {
+                nextWidth = 100 - nextX;
+                resizeGuides.push({ type: 'vertical', position: 100 });
+              }
+            }
+
+            if (fromNorth) {
+              if (Math.abs(nextY - 0) <= snapThreshY) {
+                nextHeight += nextY;
+                nextY = 0;
+                resizeGuides.push({ type: 'horizontal', position: 0 });
+              } else if (Math.abs(nextY - 50) <= snapThreshY) {
+                nextHeight += nextY - 50;
+                nextY = 50;
+                resizeGuides.push({ type: 'horizontal', position: 50 });
+              }
+            } else if (changesHeight) {
+              const currentBottom = nextY + nextHeight;
+              if (Math.abs(currentBottom - 50) <= snapThreshY) {
+                nextHeight = 50 - nextY;
+                resizeGuides.push({ type: 'horizontal', position: 50 });
+              } else if (Math.abs(currentBottom - 100) <= snapThreshY) {
+                nextHeight = 100 - nextY;
+                resizeGuides.push({ type: 'horizontal', position: 100 });
+              }
+            }
+
             return {
               ...layer,
               x: nextX,
@@ -653,10 +1297,14 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             };
           })
         );
+        setActiveGuides(resizeGuides);
       }
     };
 
     const stopPointer = () => {
+      setDragAngleInfo(null);
+      setActiveGuides([]);
+      setMarqueeBox(null);
       if (dragStartSnapshotRef.current) {
         const snapshot = dragStartSnapshotRef.current;
         dragStartSnapshotRef.current = null;
@@ -669,7 +1317,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       resizeRef.current = null;
     };
 
-    // Keyboard shortcuts: Delete, Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo)
+    // Keyboard shortcuts: Delete, Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Ctrl+D (Duplicate)
     useEffect(() => {
       const handleKeyDown = (event: KeyboardEvent) => {
         const activeEl = document.activeElement;
@@ -677,6 +1325,15 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           activeEl instanceof HTMLInputElement ||
           activeEl instanceof HTMLTextAreaElement ||
           (activeEl instanceof HTMLElement && activeEl.isContentEditable);
+
+        // Duplicate: Ctrl+D or Cmd+D
+        if ((event.ctrlKey || event.metaKey) && (event.key === 'd' || event.key === 'D')) {
+          if (!isInputFocused && editingId === null && selectedIds.length > 0) {
+            event.preventDefault();
+            duplicateSelected();
+            return;
+          }
+        }
 
         // Undo: Ctrl+Z or Cmd+Z (without Shift)
         if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z') && !event.shiftKey) {
@@ -701,9 +1358,25 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
         // Delete or Backspace
         if (event.key === 'Delete' || event.key === 'Backspace') {
-          if (!isInputFocused && editingId === null && selectedId) {
+          if (!isInputFocused && editingId === null && selectedIds.length > 0) {
             event.preventDefault();
             deleteSelected();
+            return;
+          }
+        }
+
+        // Layer ordering keyboard shortcuts: Ctrl+] (forward) and Ctrl+[ (backward)
+        if ((event.ctrlKey || event.metaKey) && (event.key === ']' || event.key === '}')) {
+          if (!isInputFocused && editingId === null && selectedId) {
+            event.preventDefault();
+            moveLayer(selectedId, event.shiftKey ? 'front' : 'forward');
+            return;
+          }
+        }
+        if ((event.ctrlKey || event.metaKey) && (event.key === '[' || event.key === '{')) {
+          if (!isInputFocused && editingId === null && selectedId) {
+            event.preventDefault();
+            moveLayer(selectedId, event.shiftKey ? 'back' : 'backward');
             return;
           }
         }
@@ -711,11 +1384,293 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedId, editingId, layers, past, future]);
+    }, [selectedIds, selectedId, editingId, layers, past, future]);
+
+    // Global pointerdown listener to deselect elements when clicking outside the canvas frame
+    useEffect(() => {
+      const handleGlobalPointerDown = (event: PointerEvent) => {
+        const target = event.target as HTMLElement | null;
+        if (!target) return;
+
+        // If clicking inside the canvas frame, canvas handlers will handle it
+        if (canvasRef.current && canvasRef.current.contains(target)) {
+          return;
+        }
+
+        // If clicking inside the top toolbar slot, keep selection so user can adjust font/color/size
+        if (portalTarget && portalTarget.contains(target)) {
+          return;
+        }
+
+        // If clicking inside the bottom position slot, keep selection
+        if (positionPortalTarget && positionPortalTarget.contains(target)) {
+          return;
+        }
+
+        // If clicking inside any custom popover, dropdown, or toolbar button
+        if (
+          target.closest('.mockup-popover-exclude') ||
+          target.closest('#custom-design-toolbar-slot') ||
+          target.closest('#custom-design-position-slot') ||
+          target.closest('.custom-tool-button')
+        ) {
+          return;
+        }
+
+        // User clicked outside the frame (in workspace, preview container, etc.): DESELECT!
+        setSelectedIds([]);
+        setEditingId(null);
+        setIsStrokeOpen(false);
+        setIsRadiusOpen(false);
+        setIsOpacityOpen(false);
+        setIsFontOpen(false);
+        setIsShapeMenuOpen(false);
+        setIsPositionOpen(false);
+      };
+
+      window.addEventListener('pointerdown', handleGlobalPointerDown);
+      return () => window.removeEventListener('pointerdown', handleGlobalPointerDown);
+    }, [portalTarget, positionPortalTarget]);
 
     const iconButton = 'custom-tool-button h-8 min-w-8 px-2 cursor-pointer select-none';
     const toggleClass = (active = false) =>
       `${iconButton} ${active ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300 font-bold' : ''}`;
+
+    const renderPositionControl = () => (
+      <div className="relative" ref={positionMenuRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setIsPositionOpen((prev) => !prev);
+            setIsStrokeOpen(false);
+            setIsRadiusOpen(false);
+            setIsOpacityOpen(false);
+            setIsFontOpen(false);
+            setIsShapeMenuOpen(false);
+          }}
+          className={`bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow cursor-pointer ${
+            isPositionOpen
+              ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300 font-bold border-orange-300 dark:border-orange-500/40'
+              : ''
+          }`}
+          title="Position / Arrange layers"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Position</span>
+        </button>
+
+        {isPositionOpen && (
+          <div
+            className="absolute bottom-full mb-2 left-0 z-50 w-72 bg-white dark:bg-[#121226] border border-slate-200/90 dark:border-slate-700/90 rounded-2xl p-3 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100 dark:border-slate-800">
+              <div className="text-xs font-bold text-slate-800 dark:text-slate-100">Layers</div>
+              <div className="text-[11px] text-slate-400 font-medium">Drag or click to reorder</div>
+            </div>
+
+            {layers.length === 0 ? (
+              <div className="py-6 text-center text-xs text-slate-400">No elements on canvas</div>
+            ) : (
+              <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-0.5 scrollbar-thin">
+                {/* Render in visual z-order from Front (top of list) to Back (bottom of list) */}
+                {[...layers].reverse().map((layer, reverseIndex) => {
+                  const isSelected = selectedIds.includes(layer.id);
+                  const actualIndex = layers.length - 1 - reverseIndex;
+                  const isTop = actualIndex === layers.length - 1;
+                  const isBottom = actualIndex === 0;
+
+                  return (
+                    <div
+                      key={layer.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', layer.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const draggedId = e.dataTransfer.getData('text/plain');
+                        if (draggedId && draggedId !== layer.id) {
+                          reorderLayers(draggedId, layer.id);
+                        }
+                      }}
+                      onClick={(e) => {
+                        if (e.shiftKey || e.ctrlKey || e.metaKey) {
+                          toggleSelectId(layer.id);
+                        } else {
+                          setSelectedId(layer.id);
+                        }
+                      }}
+                      className={`group relative flex items-center justify-between px-2.5 py-2 rounded-xl transition-all cursor-pointer ${
+                        isSelected
+                          ? 'border-2 border-purple-600 dark:border-purple-400 bg-purple-50/40 dark:bg-purple-950/20 shadow-sm'
+                          : 'border border-transparent bg-slate-100/90 dark:bg-slate-800/70 hover:bg-slate-200/80 dark:hover:bg-slate-700/70'
+                      }`}
+                    >
+                      {/* Left: 6-dot drag handle icon */}
+                      <div
+                        className="flex items-center justify-center p-1 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200 cursor-grab active:cursor-grabbing"
+                        title="Drag to reorder"
+                      >
+                        <GripVertical className="w-4 h-4" />
+                      </div>
+
+                      {/* Center: Visual Thumbnail / Preview of element */}
+                      <div className="flex-1 flex items-center justify-center h-8 px-2 overflow-hidden pointer-events-none">
+                        {layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle') && (
+                          <div
+                            className="w-12 h-6 shadow-xs"
+                            style={{
+                              backgroundColor: layer.fill || '#9333ea',
+                              borderRadius: `${Math.min(layer.radius || 0, 6)}px`,
+                            }}
+                          />
+                        )}
+                        {layer.type === 'shape' && layer.shapeType === 'circle' && (
+                          <div
+                            className="w-6 h-6 rounded-full shadow-xs"
+                            style={{ backgroundColor: layer.fill || '#9333ea' }}
+                          />
+                        )}
+                        {layer.type === 'shape' && layer.shapeType === 'triangle' && (
+                          <svg viewBox="0 0 100 100" className="w-6 h-6 drop-shadow-xs">
+                            <polygon points="50,0 100,100 0,100" fill={layer.fill || '#9333ea'} />
+                          </svg>
+                        )}
+                        {layer.type === 'shape' && layer.shapeType === 'star' && (
+                          <svg viewBox="0 0 100 100" className="w-6 h-6 drop-shadow-xs">
+                            <polygon
+                              points="50,0 61.8,35.3 100,38.2 69.1,57.3 80.9,100 50,70.0 19.1,100 30.9,57.3 0,38.2 38.2,35.3"
+                              fill={layer.fill || '#9333ea'}
+                            />
+                          </svg>
+                        )}
+                        {layer.type === 'image' && (
+                          <img src={layer.src} alt="Layer" className="h-7 w-11 object-cover rounded shadow-xs" />
+                        )}
+                        {layer.type === 'text' && (
+                          <div
+                            className="max-w-[120px] truncate text-xs font-semibold px-2 py-0.5 rounded bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/80 text-slate-800 dark:text-slate-100"
+                            style={{ fontFamily: layer.fontFamily }}
+                          >
+                            {layer.text || 'Text'}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Right: Quick reorder buttons on hover + 3-dots menu button */}
+                      <div className="flex items-center gap-0.5">
+                        {/* Up button (Bring forward) */}
+                        <button
+                          type="button"
+                          disabled={isTop}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveLayer(layer.id, 'forward');
+                          }}
+                          className={`p-1 rounded hover:bg-slate-300/60 dark:hover:bg-slate-600/60 transition-colors ${
+                            isTop ? 'opacity-20 cursor-not-allowed' : 'text-slate-600 dark:text-slate-300'
+                          }`}
+                          title="Move forward (Ctrl+])"
+                        >
+                          <ArrowUp className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Down button (Send backward) */}
+                        <button
+                          type="button"
+                          disabled={isBottom}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            moveLayer(layer.id, 'backward');
+                          }}
+                          className={`p-1 rounded hover:bg-slate-300/60 dark:hover:bg-slate-600/60 transition-colors ${
+                            isBottom ? 'opacity-20 cursor-not-allowed' : 'text-slate-600 dark:text-slate-300'
+                          }`}
+                          title="Move backward (Ctrl+[)"
+                        >
+                          <ArrowDown className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* 3-dots menu button */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveLayerMenuId(activeLayerMenuId === layer.id ? null : layer.id);
+                            }}
+                            className="p-1 rounded hover:bg-slate-300/60 dark:hover:bg-slate-600/60 text-slate-500 hover:text-slate-800 dark:hover:text-slate-100 transition-colors"
+                            title="More actions"
+                          >
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
+
+                          {activeLayerMenuId === layer.id && (
+                            <div
+                              className="absolute right-0 bottom-full mb-1 z-60 w-44 bg-white dark:bg-[#181830] border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-xl flex flex-col gap-0.5"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  moveLayer(layer.id, 'front');
+                                  setActiveLayerMenuId(null);
+                                }}
+                                className="w-full px-2.5 py-1.5 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center justify-between"
+                              >
+                                <span>To Front</span>
+                                <span className="text-[10px] text-slate-400 font-mono">Ctrl+Shift+]</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  moveLayer(layer.id, 'forward');
+                                  setActiveLayerMenuId(null);
+                                }}
+                                className="w-full px-2.5 py-1.5 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center justify-between"
+                              >
+                                <span>Forward</span>
+                                <span className="text-[10px] text-slate-400 font-mono">Ctrl+]</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  moveLayer(layer.id, 'backward');
+                                  setActiveLayerMenuId(null);
+                                }}
+                                className="w-full px-2.5 py-1.5 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center justify-between"
+                              >
+                                <span>Backward</span>
+                                <span className="text-[10px] text-slate-400 font-mono">Ctrl+[</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  moveLayer(layer.id, 'back');
+                                  setActiveLayerMenuId(null);
+                                }}
+                                className="w-full px-2.5 py-1.5 text-left text-xs text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg flex items-center justify-between"
+                              >
+                                <span>To Back</span>
+                                <span className="text-[10px] text-slate-400 font-mono">Ctrl+Shift+[</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
 
     const activeTarget = toolbarSlot || portalTarget;
 
@@ -1390,24 +2345,53 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         {activeTarget && createPortal(toolbarContent, activeTarget)}
 
         <div
-          ref={ref}
-          className="relative w-full overflow-hidden border border-slate-300 dark:border-slate-700 shadow-2xl"
+          ref={(node) => {
+            canvasRef.current = node;
+            if (typeof ref === 'function') ref(node);
+            else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+          }}
+          className="mockup-canvas-container relative w-full overflow-hidden shadow-2xl"
           style={{
             aspectRatio: `${outputWidth} / ${outputHeight}`,
             backgroundColor: backgroundColor === 'transparent' ? undefined : backgroundColor,
             backgroundImage: backgroundImage ? `url(${backgroundImage})` : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
+            border: 'none',
+            outline: 'none',
+          }}
+          onPointerDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedIds([]);
+              setEditingId(null);
+              setIsStrokeOpen(false);
+              setIsRadiusOpen(false);
+              setIsOpacityOpen(false);
+              const canvas = event.currentTarget.getBoundingClientRect();
+              const startX = ((event.clientX - canvas.left) / canvas.width) * 100;
+              const startY = ((event.clientY - canvas.top) / canvas.height) * 100;
+              setMarqueeBox({
+                startX,
+                startY,
+                currentX: startX,
+                currentY: startY,
+              });
+              (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+            }
           }}
           onPointerMove={pointerMove}
           onPointerUp={stopPointer}
           onPointerLeave={stopPointer}
-          onClick={() => {
-            setSelectedId(null);
-            setEditingId(null);
-            setIsStrokeOpen(false);
-            setIsRadiusOpen(false);
-            setIsOpacityOpen(false);
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedIds([]);
+              setEditingId(null);
+              setIsStrokeOpen(false);
+              setIsRadiusOpen(false);
+              setIsOpacityOpen(false);
+              setIsFontOpen(false);
+              setIsShapeMenuOpen(false);
+            }
           }}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
@@ -1416,17 +2400,18 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           }}
         >
           {backgroundColor === 'transparent' && !backgroundImage && (
-            <div className="absolute inset-0 bg-grid-pattern opacity-50" />
+            <div className="absolute inset-0 bg-grid-pattern opacity-50 pointer-events-none" />
           )}
           {isLoading && (
             <div className="absolute inset-0 z-20 grid place-items-center bg-black/20 text-xs text-white">
               Preparing image...
             </div>
           )}
-          {layers.map((layer) =>
+          {layers.map((layer, index) =>
             layer.id === 'source-image' && hideSourceImage ? null : (
               <div
                 key={layer.id}
+                data-layer-id={layer.id}
                 onPointerDown={(event) => {
                   if (editingId === layer.id) {
                     event.stopPropagation();
@@ -1436,7 +2421,11 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  setSelectedId(layer.id);
+                  if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+                    if (!hasDraggedRef.current) {
+                      setSelectedIds([layer.id]);
+                    }
+                  }
                 }}
                 onDoubleClick={(event) => {
                   event.stopPropagation();
@@ -1448,26 +2437,25 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 }}
                 onContextMenu={(event) => event.preventDefault()}
                 className={`absolute ${editingId === layer.id ? 'cursor-text select-text' : 'cursor-move select-none'} ${
-                  selectedId === layer.id ? 'custom-selected-element' : ''
+                  selectedIds.includes(layer.id) ? 'custom-selected-element' : ''
                 }`}
                 style={{
                   left: `${layer.x}%`,
                   top: `${layer.y}%`,
                   width: `${layer.width}%`,
                   height: layer.type === 'text' ? 'auto' : `${layer.height}%`,
+                  zIndex: index + 1,
                   opacity: (layer.opacity ?? 100) / 100,
                   borderRadius:
-                    layer.type === 'shape' && layer.shapeType === 'circle'
-                      ? '9999px'
-                      : layer.type === 'shape' && (layer.shapeType === 'triangle' || layer.shapeType === 'star')
-                      ? undefined
-                      : `${layer.radius || 0}px`,
+                    layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
+                      ? `${layer.radius || 0}px`
+                      : undefined,
                   backgroundColor:
-                    layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle' || layer.shapeType === 'circle')
+                    layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
                       ? layer.fill
                       : undefined,
                   border:
-                    layer.type !== 'shape' || (!layer.shapeType || layer.shapeType === 'rectangle' || layer.shapeType === 'circle')
+                    layer.type === 'image' || (layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle'))
                       ? layer.strokeWidth && layer.strokeWidth > 0 && layer.strokeStyle !== 'none'
                         ? `${layer.strokeWidth}px ${
                             layer.strokeStyle === 'dashed-wide' || layer.strokeStyle === 'dashed'
@@ -1494,11 +2482,36 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                     />
                   </div>
                 )}
+                {layer.type === 'shape' && layer.shapeType === 'circle' && (
+                  <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible pointer-events-none" preserveAspectRatio="none">
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="50"
+                      fill={layer.fill || '#9333ea'}
+                      stroke={
+                        layer.strokeWidth && layer.strokeWidth > 0 && layer.strokeStyle !== 'none'
+                          ? layer.stroke || '#7c3aed'
+                          : undefined
+                      }
+                      strokeWidth={layer.strokeWidth ? layer.strokeWidth * (100 / Math.max(20, layer.width * 8)) : 0}
+                      strokeDasharray={
+                        layer.strokeStyle === 'dashed-wide'
+                          ? '8,6'
+                          : layer.strokeStyle === 'dashed'
+                          ? '4,4'
+                          : layer.strokeStyle === 'dotted'
+                          ? '2,2'
+                          : undefined
+                      }
+                    />
+                  </svg>
+                )}
                 {layer.type === 'shape' && layer.shapeType === 'triangle' && (
                   <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible pointer-events-none" preserveAspectRatio="none">
                     <polygon
-                      points="50,4 96,96 4,96"
-                      fill={layer.fill || '#f97316'}
+                      points="50,0 100,100 0,100"
+                      fill={layer.fill || '#9333ea'}
                       stroke={
                         layer.strokeWidth && layer.strokeWidth > 0 && layer.strokeStyle !== 'none'
                           ? layer.stroke || '#7c3aed'
@@ -1521,8 +2534,8 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 {layer.type === 'shape' && layer.shapeType === 'star' && (
                   <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible pointer-events-none" preserveAspectRatio="none">
                     <polygon
-                      points="50,3 64,36 99,36 71,58 82,92 50,71 18,92 29,58 1,36 36,36"
-                      fill={layer.fill || '#f97316'}
+                      points="50,0 61.8,35.3 100,38.2 69.1,57.3 80.9,100 50,70.0 19.1,100 30.9,57.3 0,38.2 38.2,35.3"
+                      fill={layer.fill || '#9333ea'}
                       stroke={
                         layer.strokeWidth && layer.strokeWidth > 0 && layer.strokeStyle !== 'none'
                           ? layer.stroke || '#7c3aed'
@@ -1560,97 +2573,315 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                     }}
                   />
                 )}
-                {selectedId === layer.id && (() => {
-                  const isUniformShape =
-                    layer.type === 'shape' &&
-                    (layer.shapeType === 'circle' || layer.shapeType === 'triangle' || layer.shapeType === 'star');
-
-                  return (
-                    <div className="absolute inset-0 pointer-events-none mockup-popover-exclude z-20">
-                      {/* Webinar-style selection border around elements with ZERO gap */}
-                      <div
-                        className="absolute inset-0 border-2 border-fuchsia-500 pointer-events-none"
-                        style={{
-                          borderRadius:
-                            layer.type === 'shape' && layer.shapeType === 'circle'
-                              ? '9999px'
-                              : layer.type === 'shape'
-                              ? `${layer.radius || 0}px`
-                              : layer.type === 'text'
-                              ? '4px'
-                              : `${layer.radius || 0}px`,
-                        }}
-                      />
-
-                      {/* 4 Corner circles centered on the corners and above the line */}
-                      <div
-                        onPointerDown={(event) => resizeStart(event, layer, 'nw')}
-                        className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nwse-resize pointer-events-auto z-30 shadow-sm hover:scale-125 transition-transform"
-                        title={layer.type === 'text' ? 'Drag corner to scale font size' : isUniformShape ? 'Drag corner to scale size' : 'Resize'}
-                      />
-                      <div
-                        onPointerDown={(event) => resizeStart(event, layer, 'ne')}
-                        className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nesw-resize pointer-events-auto z-30 shadow-sm hover:scale-125 transition-transform"
-                        title={layer.type === 'text' ? 'Drag corner to scale font size' : isUniformShape ? 'Drag corner to scale size' : 'Resize'}
-                      />
-                      <div
-                        onPointerDown={(event) => resizeStart(event, layer, 'sw')}
-                        className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nesw-resize pointer-events-auto z-30 shadow-sm hover:scale-125 transition-transform"
-                        title={layer.type === 'text' ? 'Drag corner to scale font size' : isUniformShape ? 'Drag corner to scale size' : 'Resize'}
-                      />
-                      <div
-                        onPointerDown={(event) => resizeStart(event, layer, 'se')}
-                        className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nwse-resize pointer-events-auto z-30 shadow-sm hover:scale-125 transition-transform"
-                        title={layer.type === 'text' ? 'Drag corner to scale font size' : isUniformShape ? 'Drag corner to scale size' : 'Resize'}
-                      />
-
-                      {/* Left Side Pill Handle: ONLY for text or rectangle/image (NEVER for circle, star, triangle) */}
-                      {!isUniformShape && (
-                        <>
-                          <div
-                            onPointerDown={(event) => resizeStart(event, layer, 'w')}
-                            className="group/handle-w absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-30 select-none"
-                            title="Drag to decrease/increase width"
-                          >
-                            <div className="w-1.5 h-3.5 bg-white border-2 border-fuchsia-500 rounded-full shadow-sm transition-all group-hover/handle-w:hidden" />
-                            <div className="hidden group-hover/handle-w:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
-                              <MoveHorizontal className="w-3.5 h-3.5 stroke-[3]" />
-                            </div>
-                          </div>
-
-                          <div
-                            onPointerDown={(event) => resizeStart(event, layer, 'e')}
-                            className="group/handle-e absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-30 select-none"
-                            title="Drag to decrease/increase width"
-                          >
-                            <div className="w-1.5 h-3.5 bg-white border-2 border-fuchsia-500 rounded-full shadow-sm transition-all group-hover/handle-e:hidden" />
-                            <div className="hidden group-hover/handle-e:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
-                              <MoveHorizontal className="w-3.5 h-3.5 stroke-[3]" />
-                            </div>
-                          </div>
-                        </>
-                      )}
-
-                      {/* Non-text top/bottom handles: ONLY for rectangle/image (NEVER for text, circle, star, triangle) */}
-                      {layer.type !== 'text' && !isUniformShape && (
-                        <>
-                          <div
-                            onPointerDown={(event) => resizeStart(event, layer, 'n')}
-                            className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-1.5 bg-white border-2 border-fuchsia-500 rounded-full cursor-ns-resize pointer-events-auto z-30"
-                            title="Resize height"
-                          />
-                          <div
-                            onPointerDown={(event) => resizeStart(event, layer, 's')}
-                            className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3.5 h-1.5 bg-white border-2 border-fuchsia-500 rounded-full cursor-ns-resize pointer-events-auto z-30"
-                            title="Resize height"
-                          />
-                        </>
-                      )}
-                    </div>
-                  );
-                })()}
               </div>
             )
+          )}
+
+          {/* Dedicated Selection Overlay: for single selection (z-50) */}
+          {selectedIds.length === 1 && selectedLayer && (() => {
+            const isUniformShape =
+              selectedLayer.type === 'shape' &&
+              (selectedLayer.shapeType === 'circle' || selectedLayer.shapeType === 'triangle' || selectedLayer.shapeType === 'star');
+
+            return (
+              <div
+                className="absolute pointer-events-none mockup-popover-exclude z-50"
+                style={{
+                  left: `${selectedLayer.x}%`,
+                  top: `${selectedLayer.y}%`,
+                  width: `${selectedLayer.width}%`,
+                  height: selectedLayer.type === 'text' ? 'auto' : `${selectedLayer.height}%`,
+                }}
+              >
+                {/* Mirror text placeholder so overlay height matches 1:1 for text */}
+                {selectedLayer.type === 'text' && (
+                  <div
+                    className="opacity-0 pointer-events-none select-none"
+                    style={{
+                      fontFamily: selectedLayer.fontFamily,
+                      fontSize: `${selectedLayer.fontSize || 34}px`,
+                      fontWeight: selectedLayer.bold ? 'bold' : 'normal',
+                      fontStyle: selectedLayer.italic ? 'italic' : 'normal',
+                      textDecoration: selectedLayer.underline ? 'underline' : 'none',
+                      textAlign: selectedLayer.align || 'left',
+                      padding: '4px 6px',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      lineHeight: 1.25,
+                    }}
+                  >
+                    {selectedLayer.text || ' '}
+                  </div>
+                )}
+
+                {/* Selection border with ZERO gap */}
+                <div
+                  className="absolute inset-0 border-2 border-fuchsia-500 pointer-events-none"
+                  style={{
+                    borderRadius:
+                      selectedLayer.type === 'shape' && (!selectedLayer.shapeType || selectedLayer.shapeType === 'rectangle')
+                        ? `${selectedLayer.radius || 0}px`
+                        : selectedLayer.type === 'text'
+                        ? '4px'
+                        : '0px',
+                  }}
+                />
+
+                {/* 4 Corner circles centered on the corners and above the line */}
+                <div
+                  onPointerDown={(event) => resizeStart(event, selectedLayer, 'nw')}
+                  className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nwse-resize pointer-events-auto z-50 shadow-sm hover:scale-125 transition-transform"
+                  title={selectedLayer.type === 'text' ? 'Drag corner to scale font size' : 'Resize'}
+                />
+                <div
+                  onPointerDown={(event) => resizeStart(event, selectedLayer, 'ne')}
+                  className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nesw-resize pointer-events-auto z-50 shadow-sm hover:scale-125 transition-transform"
+                  title={selectedLayer.type === 'text' ? 'Drag corner to scale font size' : 'Resize'}
+                />
+                <div
+                  onPointerDown={(event) => resizeStart(event, selectedLayer, 'sw')}
+                  className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nesw-resize pointer-events-auto z-50 shadow-sm hover:scale-125 transition-transform"
+                  title={selectedLayer.type === 'text' ? 'Drag corner to scale font size' : 'Resize'}
+                />
+                <div
+                  onPointerDown={(event) => resizeStart(event, selectedLayer, 'se')}
+                  className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white border-2 border-fuchsia-500 rounded-full cursor-nwse-resize pointer-events-auto z-50 shadow-sm hover:scale-125 transition-transform"
+                  title={selectedLayer.type === 'text' ? 'Drag corner to scale font size' : 'Resize'}
+                />
+
+                {/* Left Side Pill Handle */}
+                <div
+                  onPointerDown={(event) => resizeStart(event, selectedLayer, 'w')}
+                  className="group/handle-w absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-50 select-none"
+                  title={isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
+                >
+                  <div className="w-1.5 h-3.5 bg-white border-2 border-fuchsia-500 rounded-full shadow-sm transition-all group-hover/handle-w:hidden" />
+                  <div className="hidden group-hover/handle-w:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
+                    <MoveHorizontal className="w-3.5 h-3.5 stroke-[3]" />
+                  </div>
+                </div>
+
+                {/* Right Side Pill Handle */}
+                <div
+                  onPointerDown={(event) => resizeStart(event, selectedLayer, 'e')}
+                  className="group/handle-e absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-50 select-none"
+                  title={isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
+                >
+                  <div className="w-1.5 h-3.5 bg-white border-2 border-fuchsia-500 rounded-full shadow-sm transition-all group-hover/handle-e:hidden" />
+                  <div className="hidden group-hover/handle-e:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
+                    <MoveHorizontal className="w-3.5 h-3.5 stroke-[3]" />
+                  </div>
+                </div>
+
+                {/* Top and Bottom Pill Handles (for all shapes and images) */}
+                {selectedLayer.type !== 'text' && (
+                  <>
+                    <div
+                      onPointerDown={(event) => resizeStart(event, selectedLayer, 'n')}
+                      className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3.5 h-1.5 bg-white border-2 border-fuchsia-500 rounded-full cursor-ns-resize pointer-events-auto z-50 shadow-sm"
+                      title={isUniformShape ? 'Resize' : 'Resize height'}
+                    />
+                    <div
+                      onPointerDown={(event) => resizeStart(event, selectedLayer, 's')}
+                      className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-3.5 h-1.5 bg-white border-2 border-fuchsia-500 rounded-full cursor-ns-resize pointer-events-auto z-50 shadow-sm"
+                      title={isUniformShape ? 'Resize' : 'Resize height'}
+                    />
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Multi-Selection Overlay (matching user screenshot): active when selectedIds.length > 1 */}
+          {selectedIds.length > 1 && (() => {
+            const selectedLayers = layers.filter((l) => selectedIds.includes(l.id));
+            if (selectedLayers.length === 0) return null;
+
+            const canvasRect = canvasRef.current?.getBoundingClientRect();
+            const layerBoxes = selectedLayers.map((l) => {
+              if (canvasRect && canvasRef.current) {
+                const el = canvasRef.current.querySelector(`[data-layer-id="${l.id}"]`);
+                if (el) {
+                  const r = el.getBoundingClientRect();
+                  return {
+                    id: l.id,
+                    type: l.type,
+                    x: ((r.left - canvasRect.left) / canvasRect.width) * 100,
+                    y: ((r.top - canvasRect.top) / canvasRect.height) * 100,
+                    width: (r.width / canvasRect.width) * 100,
+                    height: (r.height / canvasRect.height) * 100,
+                  };
+                }
+              }
+              return {
+                id: l.id,
+                type: l.type,
+                x: l.x,
+                y: l.y,
+                width: l.width,
+                height: l.height,
+              };
+            });
+
+            const groupMinX = Math.min(...layerBoxes.map((b) => b.x));
+            const groupMinY = Math.min(...layerBoxes.map((b) => b.y));
+            const groupMaxX = Math.max(...layerBoxes.map((b) => b.x + b.width));
+            const groupMaxY = Math.max(...layerBoxes.map((b) => b.y + b.height));
+            const groupWidth = groupMaxX - groupMinX;
+            const groupHeight = groupMaxY - groupMinY;
+
+            return (
+              <div className="absolute inset-0 pointer-events-none mockup-popover-exclude z-50">
+                {/* 1. Individual Solid Purple Borders and Center Move Icon for each element */}
+                {layerBoxes.map((b) => {
+                  const origLayer = selectedLayers.find((l) => l.id === b.id);
+                  const isRect = origLayer?.type === 'shape' && (!origLayer.shapeType || origLayer.shapeType === 'rectangle');
+                  const radius = isRect ? `${origLayer?.radius || 0}px` : origLayer?.type === 'text' ? '2px' : '0px';
+
+                  return (
+                    <div
+                      key={`multi-box-${b.id}`}
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${b.x}%`,
+                        top: `${b.y}%`,
+                        width: `${b.width}%`,
+                        height: `${b.height}%`,
+                        border: '1.5px solid #8b5cf6',
+                        borderRadius: radius,
+                      }}
+                    >
+                      {/* Center 4-way Move Crosshair Badge */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4.5 h-4.5 bg-white/95 shadow-sm border border-slate-300 rounded-full flex items-center justify-center pointer-events-none">
+                        <Move className="w-2.5 h-2.5 text-slate-700" />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* 2. Outer Dashed Bounding Box Wrapping All Selected Elements */}
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${groupMinX}%`,
+                    top: `${groupMinY}%`,
+                    width: `${groupWidth}%`,
+                    height: `${groupHeight}%`,
+                    border: '1.5px dashed #cbd5e1',
+                  }}
+                >
+                  {/* 4 Corner White Circles with subtle slate border */}
+                  <div
+                    onPointerDown={(e) => multiResizeStart(e, 'nw')}
+                    className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-slate-400 rounded-full shadow-xs cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform"
+                    title="Resize group"
+                  />
+                  <div
+                    onPointerDown={(e) => multiResizeStart(e, 'ne')}
+                    className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-white border-2 border-slate-400 rounded-full shadow-xs cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform"
+                    title="Resize group"
+                  />
+                  <div
+                    onPointerDown={(e) => multiResizeStart(e, 'sw')}
+                    className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white border-2 border-slate-400 rounded-full shadow-xs cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform"
+                    title="Resize group"
+                  />
+                  <div
+                    onPointerDown={(e) => multiResizeStart(e, 'se')}
+                    className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-3 h-3 bg-white border-2 border-slate-400 rounded-full shadow-xs cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform"
+                    title="Resize group"
+                  />
+
+                  {/* 2 Side Vertical Pill Handles (Left & Right) */}
+                  <div
+                    onPointerDown={(e) => multiResizeStart(e, 'w')}
+                    className="group/handle-mw absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1.5 z-50 select-none"
+                    title="Drag to decrease/increase width"
+                  >
+                    <div className="w-1.5 h-4 bg-white border-2 border-slate-400 rounded-full shadow-xs transition-all group-hover/handle-mw:hidden" />
+                    <div className="hidden group-hover/handle-mw:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
+                      <MoveHorizontal className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  </div>
+                  <div
+                    onPointerDown={(e) => multiResizeStart(e, 'e')}
+                    className="group/handle-me absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1.5 z-50 select-none"
+                    title="Drag to decrease/increase width"
+                  >
+                    <div className="w-1.5 h-4 bg-white border-2 border-slate-400 rounded-full shadow-xs transition-all group-hover/handle-me:hidden" />
+                    <div className="hidden group-hover/handle-me:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
+                      <MoveHorizontal className="w-3.5 h-3.5 stroke-[3]" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Marquee Rubberband Selection Box */}
+          {marqueeBox && (() => {
+            const minX = Math.min(marqueeBox.startX, marqueeBox.currentX);
+            const maxX = Math.max(marqueeBox.startX, marqueeBox.currentX);
+            const minY = Math.min(marqueeBox.startY, marqueeBox.currentY);
+            const maxY = Math.max(marqueeBox.startY, marqueeBox.currentY);
+            return (
+              <div
+                className="absolute pointer-events-none z-55 bg-fuchsia-500/15 border border-fuchsia-500 rounded-xs shadow-xs"
+                style={{
+                  left: `${minX}%`,
+                  top: `${minY}%`,
+                  width: `${maxX - minX}%`,
+                  height: `${maxY - minY}%`,
+                }}
+              />
+            );
+          })()}
+
+          {/* Shift-drag Angle indicator badge */}
+          {dragAngleInfo && (
+            <div
+              className="absolute pointer-events-none z-60 -translate-x-1/2 -translate-y-9 px-2 py-0.5 rounded-md bg-slate-900/90 text-white text-[11px] font-bold shadow-md border border-white/20 select-none"
+              style={{ left: `${dragAngleInfo.x}px`, top: `${dragAngleInfo.y}px` }}
+            >
+              <span>{dragAngleInfo.label}</span>
+            </div>
+          )}
+
+          {/* Smart Alignment Guides (Canva-style thin dotted magenta lines for center, edges, corners) */}
+          {activeGuides.length > 0 && (
+            <svg
+              className="absolute inset-0 w-full h-full pointer-events-none z-40 mockup-popover-exclude overflow-visible"
+              style={{ width: '100%', height: '100%' }}
+            >
+              {activeGuides.map((guide, idx) => {
+                if (guide.type === 'vertical') {
+                  return (
+                    <line
+                      key={`guide-v-${idx}-${guide.position}`}
+                      x1={`${guide.position}%`}
+                      y1="0%"
+                      x2={`${guide.position}%`}
+                      y2="100%"
+                      stroke="#e01cd5"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                  );
+                }
+                return (
+                  <line
+                    key={`guide-h-${idx}-${guide.position}`}
+                    x1="0%"
+                    y1={`${guide.position}%`}
+                    x2="100%"
+                    y2={`${guide.position}%`}
+                    stroke="#e01cd5"
+                    strokeWidth="1"
+                    strokeDasharray="3 3"
+                  />
+                );
+              })}
+            </svg>
           )}
           {!layers.length && (
             <div className="absolute inset-0 grid place-items-center text-center text-xs text-slate-500 dark:text-slate-400 pointer-events-none">
@@ -1659,11 +2890,8 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           )}
         </div>
 
-        <div className="flex items-center justify-between px-1 text-[10px] text-slate-400">
-          <span className="flex items-center gap-1">
-            <Plus className="w-3 h-3" /> Drag images into the canvas
-          </span>
-          {imageUrl && (
+        {imageUrl && (
+          <div className="flex items-center justify-end px-1 text-[10px] text-slate-400">
             <button
               type="button"
               onClick={() => setHideSourceImage((value) => !value)}
@@ -1672,8 +2900,10 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
               {hideSourceImage ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
               {hideSourceImage ? 'Show source' : 'Hide source'}
             </button>
-          )}
-        </div>
+          </div>
+        )}
+
+        {positionPortalTarget && createPortal(renderPositionControl(), positionPortalTarget)}
       </div>
     );
   }
