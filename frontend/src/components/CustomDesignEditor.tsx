@@ -14,6 +14,7 @@ import {
   Eye,
   EyeOff,
   FlipHorizontal,
+  FlipVertical,
   GripVertical,
   Italic,
   Layers,
@@ -22,6 +23,7 @@ import {
   Move,
   MoveHorizontal,
   Plus,
+  RotateCw,
   Search,
   Sparkles,
   Square,
@@ -38,6 +40,13 @@ type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'star';
 type TextAlign = 'left' | 'center' | 'right';
 type StrokeStyleType = 'none' | 'solid' | 'dashed-wide' | 'dashed' | 'dotted';
 
+export type CropData = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
 type DesignLayer = {
   id: string;
   type: LayerType;
@@ -46,6 +55,7 @@ type DesignLayer = {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
   text?: string;
   fontFamily?: string;
   fontSize?: number;
@@ -53,11 +63,15 @@ type DesignLayer = {
   radius?: number;
   fill?: string;
   src?: string;
+  originalSrc?: string;
   stroke?: string;
   strokeWidth?: number;
   strokeStyle?: StrokeStyleType;
   flip?: boolean;
+  flipHorizontal?: boolean;
+  flipVertical?: boolean;
   crop?: boolean;
+  cropData?: CropData;
   opacity?: number;
   bold?: boolean;
   italic?: boolean;
@@ -65,6 +79,58 @@ type DesignLayer = {
   uppercase?: boolean;
   align?: TextAlign;
   list?: boolean;
+};
+
+const getLayerFlipTransform = (layer: DesignLayer) => {
+  const isFlipH = layer.flipHorizontal ?? layer.flip ?? false;
+  const isFlipV = layer.flipVertical ?? false;
+  if (isFlipH && isFlipV) return 'scale(-1, -1)';
+  if (isFlipH) return 'scaleX(-1)';
+  if (isFlipV) return 'scaleY(-1)';
+  return undefined;
+};
+
+const getImageDimensions = (src: string): Promise<{ width: number; height: number }> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({ width: 100, height: 100 });
+    img.src = src;
+  });
+};
+
+const cropImageToDataUrl = (src: string, crop: CropData): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const sx = (crop.x / 100) * img.naturalWidth;
+        const sy = (crop.y / 100) * img.naturalHeight;
+        const sWidth = Math.max(1, (crop.width / 100) * img.naturalWidth);
+        const sHeight = Math.max(1, (crop.height / 100) * img.naturalHeight);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(sWidth));
+        canvas.height = Math.max(1, Math.round(sHeight));
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, sx, sy, sWidth, sHeight, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL());
+        } else {
+          resolve(src);
+        }
+      } catch (err) {
+        console.warn('cropImageToDataUrl canvas error:', err);
+        resolve(src);
+      }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
 };
 
 interface CustomDesignEditorProps {
@@ -202,7 +268,7 @@ const TextLayerSpan = ({ layer, isEditing, onUpdateText, onBlur }: TextLayerSpan
           event.currentTarget.blur();
         }
       }}
-      className={`block w-full whitespace-pre-wrap break-words leading-tight outline-none ${
+      className={`block w-full whitespace-pre-wrap break-words outline-none ${
         isEditing ? 'select-text cursor-text' : 'select-none cursor-move pointer-events-none'
       }`}
       style={{
@@ -216,6 +282,8 @@ const TextLayerSpan = ({ layer, isEditing, onUpdateText, onBlur }: TextLayerSpan
         textAlign: layer.align,
         direction: 'ltr',
         unicodeBidi: 'plaintext',
+        lineHeight: 1.15,
+        padding: '6px 8px',
       }}
     />
   );
@@ -248,8 +316,22 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
     const [isRadiusOpen, setIsRadiusOpen] = useState(false);
     const [isShapeMenuOpen, setIsShapeMenuOpen] = useState(false);
     const [isPositionOpen, setIsPositionOpen] = useState(false);
+    const [isFlipOpen, setIsFlipOpen] = useState(false);
     const [activeLayerMenuId, setActiveLayerMenuId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [croppingId, setCroppingId] = useState<string | null>(null);
+    const [cropDraft, setCropDraft] = useState<CropData | null>(null);
+    const [cropImgDims, setCropImgDims] = useState<{ width: number; height: number } | null>(null);
+    const cropOriginalRef = useRef<CropData | null>(null);
+    const cropDragRef = useRef<{
+      startX: number;
+      startY: number;
+      startImgLeft: number;
+      startImgTop: number;
+      baseImgW: number;
+      baseImgH: number;
+      frameRect: DOMRect;
+    } | null>(null);
     const [past, setPast] = useState<DesignLayer[][]>([]);
     const [future, setFuture] = useState<DesignLayer[][]>([]);
     const [dragAngleInfo, setDragAngleInfo] = useState<{ x: number; y: number; label: string } | null>(null);
@@ -263,6 +345,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
     const fontMenuRef = useRef<HTMLDivElement>(null);
     const shapeMenuRef = useRef<HTMLDivElement>(null);
+    const flipMenuRef = useRef<HTMLDivElement>(null);
     const positionMenuRef = useRef<HTMLDivElement>(null);
     const opacityMenuRef = useRef<HTMLDivElement>(null);
     const strokeMenuRef = useRef<HTMLDivElement>(null);
@@ -312,6 +395,13 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         type: LayerType;
         fontSize?: number;
       }>;
+    } | null>(null);
+    const rotateRef = useRef<{
+      id: string;
+      centerX: number;
+      centerY: number;
+      startRotation: number;
+      startAngle: number;
     } | null>(null);
 
     const moveLayer = (id: string, direction: 'front' | 'back' | 'forward' | 'backward') => {
@@ -450,6 +540,59 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       setEditingId(null);
     };
 
+    const autoFitTextWidth = (layer: DesignLayer, handleSide: 'w' | 'e') => {
+      if (layer.type !== 'text' || !layer.text) return;
+      const canvasRect =
+        canvasRef.current?.getBoundingClientRect() || { width: outputWidth || 800, height: outputHeight || 800 };
+      const canvasW = canvasRect.width || outputWidth || 800;
+
+      const measureCanvas = document.createElement('canvas');
+      const ctx = measureCanvas.getContext('2d');
+      if (!ctx) return;
+
+      const fontStyle = layer.italic ? 'italic ' : '';
+      const fontWeight = layer.bold ? '700 ' : '400 ';
+      const fontSize = layer.fontSize || 34;
+      const fontFamily = layer.fontFamily || 'Arial';
+      ctx.font = `${fontStyle}${fontWeight}${fontSize}px ${fontFamily}`;
+
+      const lines = (layer.text || '').split('\n');
+      let maxLineWidth = 0;
+      for (const line of lines) {
+        const textToMeasure = layer.list ? `• ${line}` : line;
+        const metrics = ctx.measureText(textToMeasure);
+        if (metrics.width > maxLineWidth) {
+          maxLineWidth = metrics.width;
+        }
+      }
+
+      // 8px left + 8px right padding + 2px safety buffer
+      const totalPixelWidth = maxLineWidth + 16 + 2;
+      const fitWidthPercent = Math.min(100, Math.max(4, (totalPixelWidth / canvasW) * 100));
+
+      pushHistory(layers);
+
+      setLayers((current) =>
+        current.map((l) => {
+          if (l.id !== layer.id) return l;
+          if (handleSide === 'w') {
+            const rightEdge = l.x + l.width;
+            const newX = Math.max(0, rightEdge - fitWidthPercent);
+            return {
+              ...l,
+              x: newX,
+              width: fitWidthPercent,
+            };
+          } else {
+            return {
+              ...l,
+              width: fitWidthPercent,
+            };
+          }
+        })
+      );
+    };
+
     // Sync portal target with slot or DOM element
     useEffect(() => {
       const updateSlots = () => {
@@ -486,17 +629,20 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         if (shapeMenuRef.current && !shapeMenuRef.current.contains(target)) {
           setIsShapeMenuOpen(false);
         }
+        if (flipMenuRef.current && !flipMenuRef.current.contains(target)) {
+          setIsFlipOpen(false);
+        }
         if (positionMenuRef.current && !positionMenuRef.current.contains(target)) {
           setIsPositionOpen(false);
           setActiveLayerMenuId(null);
         }
       };
 
-      if (isFontOpen || isOpacityOpen || isStrokeOpen || isRadiusOpen || isShapeMenuOpen || isPositionOpen) {
+      if (isFontOpen || isOpacityOpen || isStrokeOpen || isRadiusOpen || isShapeMenuOpen || isPositionOpen || isFlipOpen) {
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
       }
-    }, [isFontOpen, isOpacityOpen, isStrokeOpen, isRadiusOpen, isShapeMenuOpen, isPositionOpen]);
+    }, [isFontOpen, isOpacityOpen, isStrokeOpen, isRadiusOpen, isShapeMenuOpen, isPositionOpen, isFlipOpen]);
 
     useEffect(() => {
       setLayers((current) => {
@@ -525,6 +671,236 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         current.map((layer) => (layer.id === selectedId ? { ...layer, ...changes } : layer))
       );
     };
+
+    const startCropping = async (layerId: string) => {
+      const target = layers.find((l) => l.id === layerId && l.type === 'image');
+      if (!target || !target.src) return;
+      const baseSrc = target.originalSrc || target.src;
+      const dims = await getImageDimensions(baseSrc);
+      setCropImgDims(dims);
+
+      let initialCrop: CropData;
+      if (target.cropData) {
+        initialCrop = { ...target.cropData };
+      } else {
+        const layerPixelW = (target.width / 100) * outputWidth;
+        const layerPixelH = (target.height / 100) * outputHeight;
+        const layerAspect = layerPixelW / Math.max(1, layerPixelH);
+        const imgAspect = dims.width / Math.max(1, dims.height);
+
+        if (imgAspect > layerAspect) {
+          const w = (layerAspect / imgAspect) * 100;
+          initialCrop = { x: (100 - w) / 2, y: 0, width: w, height: 100 };
+        } else if (imgAspect < layerAspect) {
+          const h = (imgAspect / layerAspect) * 100;
+          initialCrop = { x: 0, y: (100 - h) / 2, width: 100, height: h };
+        } else {
+          initialCrop = { x: 0, y: 0, width: 100, height: 100 };
+        }
+      }
+
+      cropOriginalRef.current = initialCrop;
+      setCropDraft(initialCrop);
+      setCroppingId(layerId);
+      setSelectedIds([layerId]);
+      setIsStrokeOpen(false);
+      setIsRadiusOpen(false);
+      setIsOpacityOpen(false);
+      setIsPositionOpen(false);
+    };
+
+    const applyCrop = async () => {
+      if (!croppingId || !cropDraft) return;
+      const targetLayer = layers.find((l) => l.id === croppingId);
+      if (!targetLayer || !targetLayer.src) return;
+
+      pushHistory(layers);
+
+      const isFull =
+        Math.abs(cropDraft.x) < 0.01 &&
+        Math.abs(cropDraft.y) < 0.01 &&
+        Math.abs(cropDraft.width - 100) < 0.01 &&
+        Math.abs(cropDraft.height - 100) < 0.01;
+
+      const baseSrc = targetLayer.originalSrc || targetLayer.src;
+
+      if (isFull) {
+        setLayers((current) =>
+          current.map((l) =>
+            l.id === croppingId
+              ? {
+                  ...l,
+                  src: baseSrc,
+                  originalSrc: undefined,
+                  cropData: undefined,
+                }
+              : l
+          )
+        );
+      } else {
+        const croppedSrc = await cropImageToDataUrl(baseSrc, cropDraft);
+
+        setLayers((current) =>
+          current.map((l) =>
+            l.id === croppingId
+              ? {
+                  ...l,
+                  src: croppedSrc,
+                  originalSrc: baseSrc,
+                  cropData: cropDraft,
+                }
+              : l
+          )
+        );
+      }
+
+      setCroppingId(null);
+      setCropDraft(null);
+      setCropImgDims(null);
+      cropOriginalRef.current = null;
+    };
+
+    const resetCrop = () => {
+      if (!croppingId) return;
+      pushHistory(layers);
+      setLayers((current) =>
+        current.map((l) =>
+          l.id === croppingId
+            ? {
+                ...l,
+                src: l.originalSrc || l.src,
+                originalSrc: undefined,
+                cropData: undefined,
+              }
+            : l
+        )
+      );
+      setCroppingId(null);
+      setCropDraft(null);
+      setCropImgDims(null);
+      cropOriginalRef.current = null;
+    };
+
+    const cancelCrop = () => {
+      setCroppingId(null);
+      setCropDraft(null);
+      setCropImgDims(null);
+      cropOriginalRef.current = null;
+    };
+
+    const getCropImageLayout = (layer: DesignLayer, draft: CropData | null) => {
+      if (!cropImgDims) {
+        return { imgLeft: 0, imgTop: 0, baseImgW: 100, baseImgH: 100 };
+      }
+      const layerPixelW = (layer.width / 100) * outputWidth;
+      const layerPixelH = (layer.height / 100) * outputHeight;
+      const frameAspect = layerPixelW / Math.max(1, layerPixelH);
+      const imgAspect = cropImgDims.width / Math.max(1, cropImgDims.height);
+
+      let baseImgW = 100;
+      let baseImgH = 100;
+      if (imgAspect >= frameAspect) {
+        baseImgW = (imgAspect / frameAspect) * 100;
+        baseImgH = 100;
+      } else {
+        baseImgW = 100;
+        baseImgH = (frameAspect / imgAspect) * 100;
+      }
+
+      const crop = draft || {
+        x: (100 - (100 / baseImgW) * 100) / 2,
+        y: (100 - (100 / baseImgH) * 100) / 2,
+        width: (100 / baseImgW) * 100,
+        height: (100 / baseImgH) * 100,
+      };
+
+      const imgLeft = -(crop.x / 100) * baseImgW;
+      const imgTop = -(crop.y / 100) * baseImgH;
+
+      return { imgLeft, imgTop, baseImgW, baseImgH };
+    };
+
+    const handleCropPointerDown = (event: React.PointerEvent, layer: DesignLayer) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (!cropImgDims) return;
+
+      const frameEl =
+        (event.currentTarget as HTMLElement).closest('[data-crop-frame="true"]') ||
+        (event.currentTarget as HTMLElement);
+      const frameRect = frameEl.getBoundingClientRect();
+      if (!frameRect || frameRect.width <= 0 || frameRect.height <= 0) return;
+
+      const { imgLeft, imgTop, baseImgW, baseImgH } = getCropImageLayout(layer, cropDraft);
+
+      cropDragRef.current = {
+        startX: event.clientX,
+        startY: event.clientY,
+        startImgLeft: imgLeft,
+        startImgTop: imgTop,
+        baseImgW,
+        baseImgH,
+        frameRect,
+      };
+
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    };
+
+    const handleCropPointerMove = (event: React.PointerEvent) => {
+      if (!cropDragRef.current) return;
+      event.stopPropagation();
+      event.preventDefault();
+
+      const { startX, startY, startImgLeft, startImgTop, baseImgW, baseImgH, frameRect } = cropDragRef.current;
+      if (!frameRect || frameRect.width <= 0 || frameRect.height <= 0) return;
+
+      const deltaXPercent = ((event.clientX - startX) / frameRect.width) * 100;
+      const deltaYPercent = ((event.clientY - startY) / frameRect.height) * 100;
+
+      const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+      const minImgLeft = -(baseImgW - 100);
+      const minImgTop = -(baseImgH - 100);
+
+      const newImgLeft = clamp(startImgLeft + deltaXPercent, minImgLeft, 0);
+      const newImgTop = clamp(startImgTop + deltaYPercent, minImgTop, 0);
+
+      const nextCrop: CropData = {
+        x: clamp((-newImgLeft / baseImgW) * 100, 0, 100),
+        y: clamp((-newImgTop / baseImgH) * 100, 0, 100),
+        width: clamp((100 / baseImgW) * 100, 1, 100),
+        height: clamp((100 / baseImgH) * 100, 1, 100),
+      };
+
+      setCropDraft(nextCrop);
+    };
+
+    const handleCropPointerUp = (event: React.PointerEvent) => {
+      if (cropDragRef.current) {
+        event.stopPropagation();
+        try {
+          (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+        } catch {
+          // ignore
+        }
+        cropDragRef.current = null;
+      }
+    };
+
+    useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (!croppingId) return;
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          applyCrop();
+        } else if (e.key === 'Escape') {
+          e.preventDefault();
+          cancelCrop();
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [croppingId, cropDraft, layers]);
 
     const addShape = (shapeType: ShapeType = 'rectangle') => {
       pushHistory(layers);
@@ -567,7 +943,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
               type,
               x: 16,
               y: 18,
-              width: 68,
+              width: 34,
               height: 16,
               text: 'Your headline',
               fontFamily: availableFonts[0],
@@ -602,6 +978,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
     };
 
     const pointerDown = (event: React.PointerEvent, layer: DesignLayer) => {
+      if (editingId === layer.id) return;
       event.stopPropagation();
       const canvas = canvasRef.current?.getBoundingClientRect() || (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect();
       if (!canvas) return;
@@ -781,8 +1158,74 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     };
 
+    const rotateStart = (event: React.PointerEvent, layer: DesignLayer) => {
+      event.stopPropagation();
+      const canvas =
+        canvasRef.current?.getBoundingClientRect() ||
+        (event.currentTarget as HTMLElement).closest('.mockup-canvas-container')?.getBoundingClientRect();
+      if (!canvas) return;
+      dragStartSnapshotRef.current = layers;
+
+      const targetElem = canvasRef.current?.querySelector(`[data-layer-id="${layer.id}"]`);
+      let centerX = canvas.left + ((layer.x + layer.width / 2) / 100) * canvas.width;
+      let centerY = canvas.top + ((layer.y + layer.height / 2) / 100) * canvas.height;
+      if (targetElem) {
+        const rect = targetElem.getBoundingClientRect();
+        centerX = rect.left + rect.width / 2;
+        centerY = rect.top + rect.height / 2;
+      }
+
+      const startAngleRad = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+      const startAngleDeg = (startAngleRad * 180) / Math.PI;
+
+      rotateRef.current = {
+        id: layer.id,
+        centerX,
+        centerY,
+        startRotation: layer.rotation || 0,
+        startAngle: startAngleDeg,
+      };
+
+      setSelectedId(layer.id);
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    };
+
     const pointerMove = (event: React.PointerEvent) => {
       const canvas = event.currentTarget.getBoundingClientRect();
+
+      if (rotateRef.current) {
+        const { id, centerX, centerY, startRotation, startAngle } = rotateRef.current;
+        const currentAngleRad = Math.atan2(event.clientY - centerY, event.clientX - centerX);
+        const currentAngleDeg = (currentAngleRad * 180) / Math.PI;
+        const deltaAngle = currentAngleDeg - startAngle;
+        let newAngle = (startRotation + deltaAngle) % 360;
+        if (newAngle < 0) newAngle += 360;
+
+        if (event.shiftKey) {
+          newAngle = Math.round(newAngle / 15) * 15;
+        } else {
+          const snapAngles = [0, 45, 90, 135, 180, 225, 270, 315, 360];
+          for (const snap of snapAngles) {
+            if (Math.abs(newAngle - snap) <= 4) {
+              newAngle = snap % 360;
+              break;
+            }
+          }
+        }
+
+        const normalizedAngle = Math.round(newAngle) % 360;
+
+        setDragAngleInfo({
+          x: event.clientX - canvas.left,
+          y: event.clientY - canvas.top - 24,
+          label: `${normalizedAngle}°`,
+        });
+
+        setLayers((current) =>
+          current.map((l) => (l.id === id ? { ...l, rotation: normalizedAngle } : l))
+        );
+        return;
+      }
 
       if (marqueeBox) {
         const curX = Math.max(0, Math.min(100, ((event.clientX - canvas.left) / canvas.width) * 100));
@@ -1315,6 +1758,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       }
       dragRef.current = null;
       resizeRef.current = null;
+      rotateRef.current = null;
     };
 
     // Keyboard shortcuts: Delete, Ctrl+Z (Undo), Ctrl+Y / Ctrl+Shift+Z (Redo), Ctrl+D (Duplicate)
@@ -1928,22 +2372,118 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           <>
             <button
               type="button"
-              onClick={() => updateSelected({ crop: !selectedLayer.crop })}
-              className={`${toggleClass(selectedLayer.crop)} gap-1.5`}
-              title="Crop image"
+              onClick={() => {
+                if (croppingId === selectedLayer.id) {
+                  applyCrop();
+                } else {
+                  startCropping(selectedLayer.id);
+                }
+              }}
+              className={`custom-tool-button h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                croppingId === selectedLayer.id
+                  ? 'border-purple-600 bg-purple-600 text-white shadow-sm hover:bg-purple-700'
+                  : selectedLayer.cropData
+                  ? 'border-purple-500/50 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`}
+              title={croppingId === selectedLayer.id ? 'Apply crop (Enter)' : 'Crop image'}
             >
-              <Crop className="w-4 h-4" />
-              <span className="text-xs font-semibold">Crop</span>
+              {croppingId === selectedLayer.id ? <Check className="w-4 h-4" /> : <Crop className="w-4 h-4" />}
+              <span>{croppingId === selectedLayer.id ? 'Done' : 'Crop'}</span>
             </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ flip: !selectedLayer.flip })}
-              className={`${toggleClass(selectedLayer.flip)} gap-1.5`}
-              title="Flip image"
-            >
-              <FlipHorizontal className="w-4 h-4" />
-              <span className="text-xs font-semibold">Flip</span>
-            </button>
+            {croppingId === selectedLayer.id && (
+              <>
+                <button
+                  type="button"
+                  onClick={resetCrop}
+                  className="custom-tool-button h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Reset to full image"
+                >
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelCrop}
+                  className="custom-tool-button h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="Cancel crop (Esc)"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+            {/* Flip Dropdown Menu (Horizontal & Vertical) */}
+            <div className="relative" ref={flipMenuRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFlipOpen((prev) => !prev);
+                  setIsFontOpen(false);
+                  setIsStrokeOpen(false);
+                  setIsRadiusOpen(false);
+                  setIsOpacityOpen(false);
+                  setIsShapeMenuOpen(false);
+                  setIsPositionOpen(false);
+                }}
+                className={`custom-tool-button h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isFlipOpen || selectedLayer.flip || selectedLayer.flipHorizontal || selectedLayer.flipVertical
+                    ? 'border-orange-500 ring-1 ring-orange-500/20 bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+                title="Flip options"
+              >
+                <FlipHorizontal className="w-4 h-4" />
+                <span>Flip</span>
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isFlipOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isFlipOpen && (
+                <div
+                  className="absolute top-full mt-1.5 left-0 z-50 w-44 bg-white dark:bg-[#121226] border border-slate-200/90 dark:border-slate-700/90 rounded-2xl p-1.5 shadow-2xl"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentH = selectedLayer.flipHorizontal ?? selectedLayer.flip ?? false;
+                      updateSelected({ flipHorizontal: !currentH, flip: !currentH });
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                      selectedLayer.flipHorizontal ?? selectedLayer.flip
+                        ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300 font-semibold'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FlipHorizontal className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      <span>Flip horizontal</span>
+                    </div>
+                    {(selectedLayer.flipHorizontal ?? selectedLayer.flip) && (
+                      <Check className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentV = selectedLayer.flipVertical ?? false;
+                      updateSelected({ flipVertical: !currentV });
+                    }}
+                    className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium cursor-pointer transition-colors ${
+                      selectedLayer.flipVertical
+                        ? 'bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300 font-semibold'
+                        : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <FlipVertical className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                      <span>Flip vertical</span>
+                    </div>
+                    {selectedLayer.flipVertical && (
+                      <Check className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -2350,7 +2890,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             if (typeof ref === 'function') ref(node);
             else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
-          className="mockup-canvas-container relative w-full overflow-hidden shadow-2xl"
+          className="mockup-canvas-container relative w-full shadow-2xl"
           style={{
             aspectRatio: `${outputWidth} / ${outputHeight}`,
             backgroundColor: backgroundColor === 'transparent' ? undefined : backgroundColor,
@@ -2359,6 +2899,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             backgroundPosition: 'center',
             border: 'none',
             outline: 'none',
+            overflow: croppingId ? 'visible' : 'hidden',
           }}
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) {
@@ -2384,6 +2925,9 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           onPointerLeave={stopPointer}
           onClick={(event) => {
             if (event.target === event.currentTarget) {
+              if (croppingId) {
+                applyCrop();
+              }
               setSelectedIds([]);
               setEditingId(null);
               setIsStrokeOpen(false);
@@ -2399,6 +2943,42 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             readDroppedImage(event.dataTransfer.files[0]);
           }}
         >
+          {/* Custom Visual Guide Overlays (Smart Align Lines) */}
+          {activeGuides.map((guide, idx) => (
+            <div
+              key={idx}
+              className="pointer-events-none absolute z-40 bg-purple-500/80 shadow-[0_0_4px_rgba(168,85,247,0.8)]"
+              style={
+                guide.type === 'vertical'
+                  ? {
+                      left: `${guide.position}%`,
+                      top: 0,
+                      bottom: 0,
+                      width: '1.5px',
+                    }
+                  : {
+                      top: `${guide.position}%`,
+                      left: 0,
+                      right: 0,
+                      height: '1.5px',
+                    }
+              }
+            />
+          ))}
+
+          {/* Canvas Marquee Box overlay */}
+          {marqueeBox && (
+            <div
+              className="pointer-events-none absolute z-40 border border-purple-500 bg-purple-500/15"
+              style={{
+                left: `${Math.min(marqueeBox.startX, marqueeBox.currentX)}%`,
+                top: `${Math.min(marqueeBox.startY, marqueeBox.currentY)}%`,
+                width: `${Math.abs(marqueeBox.currentX - marqueeBox.startX)}%`,
+                height: `${Math.abs(marqueeBox.currentY - marqueeBox.startY)}%`,
+              }}
+            />
+          )}
+
           {backgroundColor === 'transparent' && !backgroundImage && (
             <div className="absolute inset-0 bg-grid-pattern opacity-50 pointer-events-none" />
           )}
@@ -2412,15 +2992,18 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
               <div
                 key={layer.id}
                 data-layer-id={layer.id}
+                data-crop-container={croppingId === layer.id ? 'true' : undefined}
                 onPointerDown={(event) => {
-                  if (editingId === layer.id) {
-                    event.stopPropagation();
-                    return;
+                  if (croppingId !== layer.id) {
+                    pointerDown(event, layer);
                   }
-                  pointerDown(event, layer);
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
+                  if (croppingId === layer.id) return;
+                  if (croppingId && croppingId !== layer.id) {
+                    applyCrop();
+                  }
                   if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
                     if (!hasDraggedRef.current) {
                       setSelectedIds([layer.id]);
@@ -2433,18 +3016,22 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                   if (layer.type === 'text') {
                     textEditStartSnapshotRef.current = layers;
                     setEditingId(layer.id);
+                  } else if (layer.type === 'image') {
+                    startCropping(layer.id);
                   }
                 }}
                 onContextMenu={(event) => event.preventDefault()}
-                className={`absolute ${editingId === layer.id ? 'cursor-text select-text' : 'cursor-move select-none'} ${
-                  selectedIds.includes(layer.id) ? 'custom-selected-element' : ''
+                className={`absolute ${editingId === layer.id ? 'cursor-text select-text' : croppingId === layer.id ? 'cursor-default' : 'cursor-move select-none'} ${
+                  selectedIds.includes(layer.id) && croppingId !== layer.id ? 'custom-selected-element' : ''
                 }`}
                 style={{
                   left: `${layer.x}%`,
                   top: `${layer.y}%`,
                   width: `${layer.width}%`,
                   height: layer.type === 'text' ? 'auto' : `${layer.height}%`,
-                  zIndex: index + 1,
+                  zIndex: croppingId === layer.id ? 40 : index + 1,
+                  transform: layer.rotation ? `rotate(${layer.rotation}deg)` : undefined,
+                  transformOrigin: 'center center',
                   opacity: (layer.opacity ?? 100) / 100,
                   borderRadius:
                     layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
@@ -2469,18 +3056,147 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 }}
               >
                 {layer.type === 'image' && layer.src && (
-                  <div className="w-full h-full overflow-hidden" style={{ borderRadius: `${layer.radius || 0}px` }}>
-                    <img
-                      src={layer.src}
-                      alt="Design element"
-                      className="w-full h-full pointer-events-none"
-                      style={{
-                        objectFit: layer.crop ? 'cover' : 'contain',
-                        borderRadius: `${layer.radius || 0}px`,
-                        transform: layer.flip ? 'scaleX(-1)' : undefined,
-                      }}
-                    />
-                  </div>
+                  croppingId === layer.id && cropDraft ? (() => {
+                    const { imgLeft, imgTop, baseImgW, baseImgH } = getCropImageLayout(layer, cropDraft);
+                    return (
+                      <div
+                        className="w-full h-full relative select-none overflow-visible"
+                        data-crop-frame="true"
+                      >
+                        {/* 1. Base Dimmed Image Background - full image extending outside the frame */}
+                        <div
+                          className="absolute select-none pointer-events-auto cursor-grab active:cursor-grabbing shadow-2xl rounded-sm overflow-hidden"
+                          style={{
+                            left: `${imgLeft}%`,
+                            top: `${imgTop}%`,
+                            width: `${baseImgW}%`,
+                            height: `${baseImgH}%`,
+                          }}
+                          onPointerDown={(e) => handleCropPointerDown(e, layer)}
+                          onPointerMove={handleCropPointerMove}
+                          onPointerUp={handleCropPointerUp}
+                          onPointerCancel={handleCropPointerUp}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <img
+                            src={layer.originalSrc || layer.src}
+                            alt="Full element"
+                            className="w-full h-full object-fill opacity-35 filter brightness-75 pointer-events-none select-none"
+                            style={{ transform: getLayerFlipTransform(layer) }}
+                          />
+                          <div className="absolute inset-0 bg-slate-900/40 pointer-events-none" />
+                        </div>
+
+                        {/* 2. Fixed Frame Viewport (stationary on canvas) with Bright Image inside */}
+                        <div
+                          className="absolute inset-0 overflow-hidden select-none pointer-events-auto cursor-grab active:cursor-grabbing border-2 border-purple-500 shadow-2xl z-20"
+                          onPointerDown={(e) => handleCropPointerDown(e, layer)}
+                          onPointerMove={handleCropPointerMove}
+                          onPointerUp={handleCropPointerUp}
+                          onPointerCancel={handleCropPointerUp}
+                          onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            applyCrop();
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {/* Crisp Clear Image inside the stationary frame */}
+                          <div
+                            className="absolute pointer-events-none select-none"
+                            style={{
+                              left: `${imgLeft}%`,
+                              top: `${imgTop}%`,
+                              width: `${baseImgW}%`,
+                              height: `${baseImgH}%`,
+                            }}
+                          >
+                            <img
+                              src={layer.originalSrc || layer.src}
+                              alt="Crop preview"
+                              className="w-full h-full object-fill pointer-events-none select-none"
+                              style={{ transform: getLayerFlipTransform(layer) }}
+                            />
+                          </div>
+
+                          {/* 3x3 Rule-of-Thirds Grid Lines on the stationary frame */}
+                          <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 z-10">
+                            <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
+                            <div />
+                          </div>
+                        </div>
+
+                        {/* 4 Corner Round Handles on the Stationary Frame */}
+                        <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
+                        <div className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
+                        <div className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
+                        <div className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
+
+                        {/* 4 Edge Pill Handles on the Stationary Frame */}
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-1.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
+                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-1.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
+                        <div className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
+                        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
+
+                        {/* Floating Quick Action Bar */}
+                        <div
+                          className="absolute z-40 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full shadow-2xl border border-slate-700/60 pointer-events-auto select-none"
+                          style={{
+                            left: '50%',
+                            top: 'calc(100% + 10px)',
+                            transform: 'translateX(-50%)',
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          onPointerDown={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={applyCrop}
+                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-600 hover:bg-purple-500 text-[11px] font-semibold text-white transition-colors cursor-pointer shadow"
+                            title="Apply crop (Enter)"
+                          >
+                            <Check className="w-3 h-3" />
+                            <span>Done</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={resetCrop}
+                            className="px-2 py-0.5 rounded-full hover:bg-slate-800 text-[11px] font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            title="Reset crop to full image"
+                          >
+                            Reset
+                          </button>
+                          <button
+                            type="button"
+                            onClick={cancelCrop}
+                            className="p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                            title="Cancel (Esc)"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })() : (
+                    <div className="w-full h-full overflow-hidden relative" style={{ borderRadius: `${layer.radius || 0}px` }}>
+                      <img
+                        src={layer.src}
+                        alt="Design element"
+                        className="w-full h-full pointer-events-none"
+                        style={{
+                          objectFit: 'cover',
+                          borderRadius: `${layer.radius || 0}px`,
+                          transform: getLayerFlipTransform(layer),
+                        }}
+                      />
+                    </div>
+                  )
                 )}
                 {layer.type === 'shape' && layer.shapeType === 'circle' && (
                   <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible pointer-events-none" preserveAspectRatio="none">
@@ -2578,7 +3294,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           )}
 
           {/* Dedicated Selection Overlay: for single selection (z-50) */}
-          {selectedIds.length === 1 && selectedLayer && (() => {
+          {selectedIds.length === 1 && selectedLayer && croppingId !== selectedLayer.id && (() => {
             const isUniformShape =
               selectedLayer.type === 'shape' &&
               (selectedLayer.shapeType === 'circle' || selectedLayer.shapeType === 'triangle' || selectedLayer.shapeType === 'star');
@@ -2591,6 +3307,8 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                   top: `${selectedLayer.y}%`,
                   width: `${selectedLayer.width}%`,
                   height: selectedLayer.type === 'text' ? 'auto' : `${selectedLayer.height}%`,
+                  transform: selectedLayer.rotation ? `rotate(${selectedLayer.rotation}deg)` : undefined,
+                  transformOrigin: 'center center',
                 }}
               >
                 {/* Mirror text placeholder so overlay height matches 1:1 for text */}
@@ -2604,10 +3322,10 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                       fontStyle: selectedLayer.italic ? 'italic' : 'normal',
                       textDecoration: selectedLayer.underline ? 'underline' : 'none',
                       textAlign: selectedLayer.align || 'left',
-                      padding: '4px 6px',
+                      padding: '6px 8px',
                       whiteSpace: 'pre-wrap',
                       wordBreak: 'break-word',
-                      lineHeight: 1.25,
+                      lineHeight: 1.15,
                     }}
                   >
                     {selectedLayer.text || ' '}
@@ -2652,8 +3370,12 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 {/* Left Side Pill Handle */}
                 <div
                   onPointerDown={(event) => resizeStart(event, selectedLayer, 'w')}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    autoFitTextWidth(selectedLayer, 'w');
+                  }}
                   className="group/handle-w absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-50 select-none"
-                  title={isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
+                  title={selectedLayer.type === 'text' ? 'Drag to resize width, double-click to auto-fit text' : isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
                 >
                   <div className="w-1.5 h-3.5 bg-white border-2 border-fuchsia-500 rounded-full shadow-sm transition-all group-hover/handle-w:hidden" />
                   <div className="hidden group-hover/handle-w:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
@@ -2664,8 +3386,12 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 {/* Right Side Pill Handle */}
                 <div
                   onPointerDown={(event) => resizeStart(event, selectedLayer, 'e')}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    autoFitTextWidth(selectedLayer, 'e');
+                  }}
                   className="group/handle-e absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-50 select-none"
-                  title={isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
+                  title={selectedLayer.type === 'text' ? 'Drag to resize width, double-click to auto-fit text' : isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
                 >
                   <div className="w-1.5 h-3.5 bg-white border-2 border-fuchsia-500 rounded-full shadow-sm transition-all group-hover/handle-e:hidden" />
                   <div className="hidden group-hover/handle-e:flex items-center justify-center w-5 h-5 bg-white border-2 border-fuchsia-500 rounded-full shadow-md text-fuchsia-600">
@@ -2688,6 +3414,19 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                     />
                   </>
                 )}
+
+                {/* Rotate handle: stem line + circular button with Rotate icon */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-auto select-none z-50 cursor-grab active:cursor-grabbing"
+                  style={{ top: 'calc(100% + 6px)' }}
+                  onPointerDown={(event) => rotateStart(event, selectedLayer)}
+                  title="Drag to rotate (Hold Shift for 15° steps)"
+                >
+                  <div className="w-0.5 h-3 bg-fuchsia-500" />
+                  <div className="w-5 h-5 rounded-full bg-white border-2 border-fuchsia-500 shadow-md flex items-center justify-center text-fuchsia-600 hover:scale-110 hover:bg-fuchsia-50 transition-transform">
+                    <RotateCw className="w-3 h-3 stroke-[2.5]" />
+                  </div>
+                </div>
               </div>
             );
           })()}
