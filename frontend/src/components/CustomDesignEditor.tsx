@@ -289,6 +289,47 @@ const TextLayerSpan = ({ layer, isEditing, onUpdateText, onBlur }: TextLayerSpan
   );
 };
 
+const ToolbarTooltip = ({
+  label,
+  children,
+  side = 'bottom',
+}: {
+  label: string;
+  children: React.ReactNode;
+  side?: 'top' | 'bottom';
+}) => {
+  return (
+    <div className="relative group/tooltip inline-flex items-center justify-center">
+      {children}
+      <div
+        className={`pointer-events-none absolute z-[9999] hidden group-hover/tooltip:flex items-center justify-center whitespace-nowrap rounded-lg bg-[#18181b] px-3 py-1.5 text-[11.5px] font-semibold text-white shadow-[0_4px_16px_rgba(0,0,0,0.35)] select-none animate-in fade-in zoom-in-95 duration-100 ${
+          side === 'bottom'
+            ? 'top-[calc(100%+6px)] left-1/2 -translate-x-1/2'
+            : 'bottom-[calc(100%+6px)] left-1/2 -translate-x-1/2'
+        }`}
+      >
+        {/* Caret pointing directly to button */}
+        {side === 'bottom' ? (
+          <svg
+            className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-2.5 h-1.5 fill-[#18181b] overflow-visible"
+            viewBox="0 0 10 5"
+          >
+            <path d="M0 5L5 0L10 5Z" />
+          </svg>
+        ) : (
+          <svg
+            className="absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-2.5 h-1.5 fill-[#18181b] overflow-visible"
+            viewBox="0 0 10 5"
+          >
+            <path d="M0 0L5 5L10 0Z" />
+          </svg>
+        )}
+        <span className="relative z-10 leading-none">{label}</span>
+      </div>
+    </div>
+  );
+};
+
 const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
   ({ imageUrl, backgroundColor, backgroundImage, outputWidth, outputHeight, isLoading, toolbarSlot }, ref) => {
     const [layers, setLayers] = useState<DesignLayer[]>(() => (imageUrl ? [sourceLayer(imageUrl)] : []));
@@ -540,56 +581,70 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       setEditingId(null);
     };
 
-    const autoFitTextWidth = (layer: DesignLayer, handleSide: 'w' | 'e') => {
+    const autoFitTextWidth = (layer: DesignLayer) => {
       if (layer.type !== 'text' || !layer.text) return;
       const canvasRect =
         canvasRef.current?.getBoundingClientRect() || { width: outputWidth || 800, height: outputHeight || 800 };
       const canvasW = canvasRect.width || outputWidth || 800;
 
+      let maxLineWidth = 0;
+      const layerElem = canvasRef.current?.querySelector(`[data-layer-id="${layer.id}"]`);
+      const spanElem = layerElem?.querySelector('span');
+
       const measureCanvas = document.createElement('canvas');
       const ctx = measureCanvas.getContext('2d');
-      if (!ctx) return;
-
-      const fontStyle = layer.italic ? 'italic ' : '';
-      const fontWeight = layer.bold ? '700 ' : '400 ';
-      const fontSize = layer.fontSize || 34;
-      const fontFamily = layer.fontFamily || 'Arial';
-      ctx.font = `${fontStyle}${fontWeight}${fontSize}px ${fontFamily}`;
-
-      const lines = (layer.text || '').split('\n');
-      let maxLineWidth = 0;
-      for (const line of lines) {
-        const textToMeasure = layer.list ? `• ${line}` : line;
-        const metrics = ctx.measureText(textToMeasure);
-        if (metrics.width > maxLineWidth) {
-          maxLineWidth = metrics.width;
+      if (ctx) {
+        if (spanElem) {
+          const computed = window.getComputedStyle(spanElem);
+          ctx.font = `${computed.fontStyle} ${computed.fontWeight} ${computed.fontSize} ${computed.fontFamily}`;
+        } else {
+          const fontStyle = layer.italic ? 'italic ' : '';
+          const fontWeight = layer.bold ? '700 ' : '400 ';
+          const fontSize = layer.fontSize || 34;
+          const fontFamily = layer.fontFamily || availableFonts[0] || 'sans-serif';
+          ctx.font = `${fontStyle}${fontWeight}${fontSize}px ${fontFamily}`;
+        }
+        const lines = (layer.text || '').split('\n');
+        for (const line of lines) {
+          const textToMeasure = layer.list ? `• ${line}` : line;
+          const metrics = ctx.measureText(textToMeasure);
+          if (metrics.width > maxLineWidth) {
+            maxLineWidth = metrics.width;
+          }
         }
       }
 
-      // 8px left + 8px right padding + 2px safety buffer
+      // Add 8px left + 8px right padding + 2px safety margin
       const totalPixelWidth = maxLineWidth + 16 + 2;
       const fitWidthPercent = Math.min(100, Math.max(4, (totalPixelWidth / canvasW) * 100));
+
+      const oldWidth = layer.width;
+      const oldX = layer.x;
+      const align = layer.align || 'left';
+
+      let newX = oldX;
+      if (align === 'center') {
+        const centerX = oldX + oldWidth / 2;
+        newX = centerX - fitWidthPercent / 2;
+      } else if (align === 'right') {
+        const rightEdge = oldX + oldWidth;
+        newX = rightEdge - fitWidthPercent;
+      } else {
+        newX = oldX;
+      }
 
       pushHistory(layers);
 
       setLayers((current) =>
-        current.map((l) => {
-          if (l.id !== layer.id) return l;
-          if (handleSide === 'w') {
-            const rightEdge = l.x + l.width;
-            const newX = Math.max(0, rightEdge - fitWidthPercent);
-            return {
-              ...l,
-              x: newX,
-              width: fitWidthPercent,
-            };
-          } else {
-            return {
-              ...l,
-              width: fitWidthPercent,
-            };
-          }
-        })
+        current.map((l) =>
+          l.id === layer.id
+            ? {
+                ...l,
+                x: Math.max(0, newX),
+                width: fitWidthPercent,
+              }
+            : l
+        )
       );
     };
 
@@ -1882,26 +1937,27 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
     const renderPositionControl = () => (
       <div className="relative" ref={positionMenuRef}>
-        <button
-          type="button"
-          onClick={() => {
-            setIsPositionOpen((prev) => !prev);
-            setIsStrokeOpen(false);
-            setIsRadiusOpen(false);
-            setIsOpacityOpen(false);
-            setIsFontOpen(false);
-            setIsShapeMenuOpen(false);
-          }}
-          className={`bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow cursor-pointer ${
-            isPositionOpen
-              ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300 font-bold border-orange-300 dark:border-orange-500/40'
-              : ''
-          }`}
-          title="Position / Arrange layers"
-        >
-          <Layers className="w-3.5 h-3.5" />
-          <span>Position</span>
-        </button>
+        <ToolbarTooltip label="Position layers" side="top">
+          <button
+            type="button"
+            onClick={() => {
+              setIsPositionOpen((prev) => !prev);
+              setIsStrokeOpen(false);
+              setIsRadiusOpen(false);
+              setIsOpacityOpen(false);
+              setIsFontOpen(false);
+              setIsShapeMenuOpen(false);
+            }}
+            className={`bg-white/60 dark:bg-[#0e0e24] hover:bg-indigo-50/80 dark:hover:bg-[#181836] border border-slate-200/80 dark:border-[#1c1c38] text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 shadow-sm hover:shadow cursor-pointer ${
+              isPositionOpen
+                ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300 font-bold border-orange-300 dark:border-orange-500/40'
+                : ''
+            }`}
+          >
+            <Layers className="w-3.5 h-3.5" />
+            <span>Position</span>
+          </button>
+        </ToolbarTooltip>
 
         {isPositionOpen && (
           <div
@@ -2126,47 +2182,47 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       >
         {/* Shape Fill Color (when shape selected) */}
         {selectedLayer?.type === 'shape' && (
-          <label
-            className="custom-tool-button h-8 w-8 relative flex flex-col items-center justify-center cursor-pointer select-none"
-            title="Shape fill color"
-          >
-            <span
-              className="w-4 h-4 rounded border border-slate-300 dark:border-slate-600"
-              style={{ background: selectedLayer.fill || '#f97316' }}
-            />
-            <input
-              type="color"
-              value={selectedLayer.fill || '#f97316'}
-              onChange={(event) => updateSelected({ fill: event.target.value })}
-              className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-            />
-          </label>
+          <ToolbarTooltip label="Fill color">
+            <label className="custom-tool-button h-8 w-8 relative flex flex-col items-center justify-center cursor-pointer select-none">
+              <span
+                className="w-4 h-4 rounded border border-slate-300 dark:border-slate-600"
+                style={{ background: selectedLayer.fill || '#f97316' }}
+              />
+              <input
+                type="color"
+                value={selectedLayer.fill || '#f97316'}
+                onChange={(event) => updateSelected({ fill: event.target.value })}
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+              />
+            </label>
+          </ToolbarTooltip>
         )}
 
         {/* Stroke / Border Style & Weight Popup (Image & Shape) */}
         {(selectedLayer?.type === 'image' || selectedLayer?.type === 'shape') && (
           <div className="relative" ref={strokeMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsStrokeOpen((prev) => !prev);
-                setIsRadiusOpen(false);
-                setIsOpacityOpen(false);
-              }}
-              className={`custom-tool-button h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${
-                isStrokeOpen || (selectedLayer.strokeWidth && selectedLayer.strokeWidth > 0 && selectedLayer.strokeStyle !== 'none')
-                  ? 'bg-slate-200/90 dark:bg-slate-700/90 text-slate-900 dark:text-white'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
-              }`}
-              title="Border style"
-            >
-              {/* Canva 3 horizontal lines icon */}
-              <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <rect x="2" y="3.5" width="16" height="3" rx="1" />
-                <rect x="2" y="8.5" width="16" height="2" rx="0.75" />
-                <rect x="2" y="13" width="16" height="1.2" rx="0.5" />
-              </svg>
-            </button>
+            <ToolbarTooltip label="Border style">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsStrokeOpen((prev) => !prev);
+                  setIsRadiusOpen(false);
+                  setIsOpacityOpen(false);
+                }}
+                className={`custom-tool-button h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${
+                  isStrokeOpen || (selectedLayer.strokeWidth && selectedLayer.strokeWidth > 0 && selectedLayer.strokeStyle !== 'none')
+                    ? 'bg-slate-200/90 dark:bg-slate-700/90 text-slate-900 dark:text-white'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                }`}
+              >
+                {/* Canva 3 horizontal lines icon */}
+                <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                  <rect x="2" y="3.5" width="16" height="3" rx="1" />
+                  <rect x="2" y="8.5" width="16" height="2" rx="0.75" />
+                  <rect x="2" y="13" width="16" height="1.2" rx="0.5" />
+                </svg>
+              </button>
+            </ToolbarTooltip>
 
             {isStrokeOpen && (
               <div
@@ -2315,25 +2371,26 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         {/* Corner Rounding Popup (Image & Rectangle Shape) */}
         {(selectedLayer?.type === 'image' || (selectedLayer?.type === 'shape' && (!selectedLayer.shapeType || selectedLayer.shapeType === 'rectangle'))) && (
           <div className="relative" ref={radiusMenuRef}>
-            <button
-              type="button"
-              onClick={() => {
-                setIsRadiusOpen((prev) => !prev);
-                setIsStrokeOpen(false);
-                setIsOpacityOpen(false);
-              }}
-              className={`custom-tool-button h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${
-                isRadiusOpen || (selectedLayer.radius && selectedLayer.radius > 0)
-                  ? 'bg-slate-200/90 dark:bg-slate-700/90 text-slate-900 dark:text-white'
-                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
-              }`}
-              title="Corner rounding"
-            >
-              {/* Canva corner rounding icon */}
-              <svg className="w-4 h-4 text-current" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 17V11C4 7.13401 7.13401 4 11 4H17" strokeWidth="2.2" />
-              </svg>
-            </button>
+            <ToolbarTooltip label="Corner rounding">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsRadiusOpen((prev) => !prev);
+                  setIsStrokeOpen(false);
+                  setIsOpacityOpen(false);
+                }}
+                className={`custom-tool-button h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${
+                  isRadiusOpen || (selectedLayer.radius && selectedLayer.radius > 0)
+                    ? 'bg-slate-200/90 dark:bg-slate-700/90 text-slate-900 dark:text-white'
+                    : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200'
+                }`}
+              >
+                {/* Canva corner rounding icon */}
+                <svg className="w-4 h-4 text-current" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 17V11C4 7.13401 7.13401 4 11 4H17" strokeWidth="2.2" />
+                </svg>
+              </button>
+            </ToolbarTooltip>
 
             {isRadiusOpen && (
               <div
@@ -2370,71 +2427,75 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
         {/* Crop & Flip (Image only) */}
         {selectedLayer?.type === 'image' && (
           <>
-            <button
-              type="button"
-              onClick={() => {
-                if (croppingId === selectedLayer.id) {
-                  applyCrop();
-                } else {
-                  startCropping(selectedLayer.id);
-                }
-              }}
-              className={`custom-tool-button h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                croppingId === selectedLayer.id
-                  ? 'border-purple-600 bg-purple-600 text-white shadow-sm hover:bg-purple-700'
-                  : selectedLayer.cropData
-                  ? 'border-purple-500/50 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300'
-                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-              }`}
-              title={croppingId === selectedLayer.id ? 'Apply crop (Enter)' : 'Crop image'}
-            >
-              {croppingId === selectedLayer.id ? <Check className="w-4 h-4" /> : <Crop className="w-4 h-4" />}
-              <span>{croppingId === selectedLayer.id ? 'Done' : 'Crop'}</span>
-            </button>
+            <ToolbarTooltip label={croppingId === selectedLayer.id ? "Done crop" : "Crop"}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (croppingId === selectedLayer.id) {
+                    applyCrop();
+                  } else {
+                    startCropping(selectedLayer.id);
+                  }
+                }}
+                className={`custom-tool-button h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  croppingId === selectedLayer.id
+                    ? 'border-purple-600 bg-purple-600 text-white shadow-sm hover:bg-purple-700'
+                    : selectedLayer.cropData
+                    ? 'border-purple-500/50 bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                }`}
+              >
+                {croppingId === selectedLayer.id ? <Check className="w-4 h-4" /> : <Crop className="w-4 h-4" />}
+                <span>{croppingId === selectedLayer.id ? 'Done' : 'Crop'}</span>
+              </button>
+            </ToolbarTooltip>
             {croppingId === selectedLayer.id && (
               <>
-                <button
-                  type="button"
-                  onClick={resetCrop}
-                  className="custom-tool-button h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Reset to full image"
-                >
-                  Reset
-                </button>
-                <button
-                  type="button"
-                  onClick={cancelCrop}
-                  className="custom-tool-button h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                  title="Cancel crop (Esc)"
-                >
-                  Cancel
-                </button>
+                <ToolbarTooltip label="Reset crop">
+                  <button
+                    type="button"
+                    onClick={resetCrop}
+                    className="custom-tool-button h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                </ToolbarTooltip>
+                <ToolbarTooltip label="Cancel crop">
+                  <button
+                    type="button"
+                    onClick={cancelCrop}
+                    className="custom-tool-button h-8 px-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </ToolbarTooltip>
               </>
             )}
             {/* Flip Dropdown Menu (Horizontal & Vertical) */}
             <div className="relative" ref={flipMenuRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFlipOpen((prev) => !prev);
-                  setIsFontOpen(false);
-                  setIsStrokeOpen(false);
-                  setIsRadiusOpen(false);
-                  setIsOpacityOpen(false);
-                  setIsShapeMenuOpen(false);
-                  setIsPositionOpen(false);
-                }}
-                className={`custom-tool-button h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
-                  isFlipOpen || selectedLayer.flip || selectedLayer.flipHorizontal || selectedLayer.flipVertical
-                    ? 'border-orange-500 ring-1 ring-orange-500/20 bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300'
-                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Flip options"
-              >
-                <FlipHorizontal className="w-4 h-4" />
-                <span>Flip</span>
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isFlipOpen ? 'rotate-180' : ''}`} />
-              </button>
+              <ToolbarTooltip label="Flip">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFlipOpen((prev) => !prev);
+                    setIsFontOpen(false);
+                    setIsStrokeOpen(false);
+                    setIsRadiusOpen(false);
+                    setIsOpacityOpen(false);
+                    setIsShapeMenuOpen(false);
+                    setIsPositionOpen(false);
+                  }}
+                  className={`custom-tool-button h-8 px-2.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    isFlipOpen || selectedLayer.flip || selectedLayer.flipHorizontal || selectedLayer.flipVertical
+                      ? 'border-orange-500 ring-1 ring-orange-500/20 bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <FlipHorizontal className="w-4 h-4" />
+                  <span>Flip</span>
+                  <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isFlipOpen ? 'rotate-180' : ''}`} />
+                </button>
+              </ToolbarTooltip>
 
               {isFlipOpen && (
                 <div
@@ -2492,33 +2553,34 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           <>
             {/* Searchable Custom Font Dropdown */}
             <div className="relative" ref={fontMenuRef}>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFontOpen((open) => !open);
-                  setIsStrokeOpen(false);
-                  setIsRadiusOpen(false);
-                  setIsOpacityOpen(false);
-                }}
-                className={`custom-tool-button h-8 px-2.5 rounded-lg border bg-white dark:bg-slate-900 flex items-center justify-between gap-1 text-xs font-semibold cursor-pointer w-36 transition-colors ${
-                  isFontOpen
-                    ? 'border-orange-500 ring-1 ring-orange-500/20 text-orange-600 dark:text-orange-300'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300'
-                }`}
-                title="Change font family"
-              >
-                <span
-                  className="truncate text-left text-xs font-semibold"
-                  style={{ fontFamily: selectedLayer.fontFamily || availableFonts[0] }}
-                >
-                  {selectedLayer.fontFamily || availableFonts[0]}
-                </span>
-                <ChevronDown
-                  className={`w-3.5 h-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
-                    isFontOpen ? 'rotate-180 text-orange-500' : ''
+              <ToolbarTooltip label="Font family">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsFontOpen((open) => !open);
+                    setIsStrokeOpen(false);
+                    setIsRadiusOpen(false);
+                    setIsOpacityOpen(false);
+                  }}
+                  className={`custom-tool-button h-8 px-2.5 rounded-lg border bg-white dark:bg-slate-900 flex items-center justify-between gap-1 text-xs font-semibold cursor-pointer w-36 transition-colors ${
+                    isFontOpen
+                      ? 'border-orange-500 ring-1 ring-orange-500/20 text-orange-600 dark:text-orange-300'
+                      : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:border-slate-300'
                   }`}
-                />
-              </button>
+                >
+                  <span
+                    className="truncate text-left text-xs font-semibold"
+                    style={{ fontFamily: selectedLayer.fontFamily || availableFonts[0] }}
+                  >
+                    {selectedLayer.fontFamily || availableFonts[0]}
+                  </span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 shrink-0 text-slate-400 transition-transform duration-200 ${
+                      isFontOpen ? 'rotate-180 text-orange-500' : ''
+                    }`}
+                  />
+                </button>
+              </ToolbarTooltip>
 
               {isFontOpen && (
                 <div
@@ -2607,154 +2669,158 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                 </div>
               )}
             </div>
-            <input
-              className="custom-size-input text-center"
-              type="text"
-              inputMode="numeric"
-              value={selectedLayer.fontSize !== undefined && selectedLayer.fontSize > 0 ? selectedLayer.fontSize : ''}
-              placeholder="34"
-              onChange={(event) => {
-                const raw = event.target.value.replace(/[^0-9]/g, '');
-                if (raw === '') {
-                  updateSelected({ fontSize: 0 });
-                } else {
-                  const num = Math.min(160, parseInt(raw, 10));
-                  updateSelected({ fontSize: num });
-                }
-              }}
-              onBlur={(event) => {
-                const num = parseInt(event.target.value, 10);
-                if (!num || num < 8) {
-                  updateSelected({ fontSize: 8 });
-                } else if (num > 160) {
-                  updateSelected({ fontSize: 160 });
-                }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === 'ArrowUp') {
-                  event.preventDefault();
-                  updateSelected({ fontSize: Math.min(160, (selectedLayer.fontSize || 34) + 1) });
-                } else if (event.key === 'ArrowDown') {
-                  event.preventDefault();
-                  updateSelected({ fontSize: Math.max(8, (selectedLayer.fontSize || 34) - 1) });
-                } else if (event.key === 'Enter') {
-                  event.currentTarget.blur();
-                }
-              }}
-              title="Font size"
-            />
-            {/* Font Color with rainbow underline */}
-            <label
-              className="custom-tool-button h-8 w-8 relative flex flex-col items-center justify-center cursor-pointer select-none"
-              title="Font color"
-            >
-              <span className="text-xs font-black leading-none text-slate-800 dark:text-slate-100">A</span>
-              <span
-                className="h-[3px] w-3.5 rounded-full mt-0.5"
-                style={{
-                  background:
-                    selectedLayer.color && selectedLayer.color !== '#ffffff'
-                      ? selectedLayer.color
-                      : 'linear-gradient(90deg, #ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6)',
+            <ToolbarTooltip label="Font size">
+              <input
+                className="custom-size-input text-center"
+                type="text"
+                inputMode="numeric"
+                value={selectedLayer.fontSize !== undefined && selectedLayer.fontSize > 0 ? selectedLayer.fontSize : ''}
+                placeholder="34"
+                onChange={(event) => {
+                  const raw = event.target.value.replace(/[^0-9]/g, '');
+                  if (raw === '') {
+                    updateSelected({ fontSize: 0 });
+                  } else {
+                    const num = Math.min(160, parseInt(raw, 10));
+                    updateSelected({ fontSize: num });
+                  }
+                }}
+                onBlur={(event) => {
+                  const num = parseInt(event.target.value, 10);
+                  if (!num || num < 8) {
+                    updateSelected({ fontSize: 8 });
+                  } else if (num > 160) {
+                    updateSelected({ fontSize: 160 });
+                  }
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    updateSelected({ fontSize: Math.min(160, (selectedLayer.fontSize || 34) + 1) });
+                  } else if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    updateSelected({ fontSize: Math.max(8, (selectedLayer.fontSize || 34) - 1) });
+                  } else if (event.key === 'Enter') {
+                    event.currentTarget.blur();
+                  }
                 }}
               />
-              <input
-                type="color"
-                value={selectedLayer.color || '#ffffff'}
-                onChange={(event) => updateSelected({ color: event.target.value })}
-                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() => updateSelected({ bold: !selectedLayer.bold })}
-              className={toggleClass(selectedLayer.bold)}
-              title="Bold"
-            >
-              <Bold className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ italic: !selectedLayer.italic })}
-              className={toggleClass(selectedLayer.italic)}
-              title="Italic"
-            >
-              <Italic className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ underline: !selectedLayer.underline })}
-              className={toggleClass(selectedLayer.underline)}
-              title="Underline"
-            >
-              <Underline className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ uppercase: !selectedLayer.uppercase })}
-              className={toggleClass(selectedLayer.uppercase)}
-              title="Uppercase"
-            >
-              <span className="text-xs font-bold leading-none">AB</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ align: 'left' })}
-              className={toggleClass(selectedLayer.align === 'left' || !selectedLayer.align)}
-              title="Align left"
-            >
-              <AlignLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ align: 'center' })}
-              className={toggleClass(selectedLayer.align === 'center')}
-              title="Align center"
-            >
-              <AlignCenter className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ align: 'right' })}
-              className={toggleClass(selectedLayer.align === 'right')}
-              title="Align right"
-            >
-              <AlignRight className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => updateSelected({ list: !selectedLayer.list })}
-              className={toggleClass(selectedLayer.list)}
-              title="List"
-            >
-              <List className="w-4 h-4" />
-            </button>
+            </ToolbarTooltip>
+            {/* Font Color with rainbow underline */}
+            <ToolbarTooltip label="Text color">
+              <label
+                className="custom-tool-button h-8 w-8 relative flex flex-col items-center justify-center cursor-pointer select-none"
+              >
+                <span className="text-xs font-black leading-none text-slate-800 dark:text-slate-100">A</span>
+                <span
+                  className="h-[3px] w-3.5 rounded-full mt-0.5"
+                  style={{
+                    background:
+                      selectedLayer.color && selectedLayer.color !== '#ffffff'
+                        ? selectedLayer.color
+                        : 'linear-gradient(90deg, #ef4444, #f59e0b, #10b981, #3b82f6, #8b5cf6)',
+                  }}
+                />
+                <input
+                  type="color"
+                  value={selectedLayer.color || '#ffffff'}
+                  onChange={(event) => updateSelected({ color: event.target.value })}
+                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                />
+              </label>
+            </ToolbarTooltip>
+            <ToolbarTooltip label="Bold">
+              <button
+                type="button"
+                onClick={() => updateSelected({ bold: !selectedLayer.bold })}
+                className={toggleClass(selectedLayer.bold)}
+              >
+                <Bold className="w-4 h-4" />
+              </button>
+            </ToolbarTooltip>
+            <ToolbarTooltip label="Italic">
+              <button
+                type="button"
+                onClick={() => updateSelected({ italic: !selectedLayer.italic })}
+                className={toggleClass(selectedLayer.italic)}
+              >
+                <Italic className="w-4 h-4" />
+              </button>
+            </ToolbarTooltip>
+            <ToolbarTooltip label="Underline">
+              <button
+                type="button"
+                onClick={() => updateSelected({ underline: !selectedLayer.underline })}
+                className={toggleClass(selectedLayer.underline)}
+              >
+                <Underline className="w-4 h-4" />
+              </button>
+            </ToolbarTooltip>
+            <ToolbarTooltip label="Uppercase">
+              <button
+                type="button"
+                onClick={() => updateSelected({ uppercase: !selectedLayer.uppercase })}
+                className={toggleClass(selectedLayer.uppercase)}
+              >
+                <span className="text-xs font-bold leading-none">AB</span>
+              </button>
+            </ToolbarTooltip>
+            {/* Single Unified Alignment Cycle Button (Left -> Center -> Right -> Left) with Tooltip */}
+            <ToolbarTooltip label="Alignment">
+              <button
+                type="button"
+                onClick={() => {
+                  const current = selectedLayer.align || 'left';
+                  const nextAlign = current === 'left' ? 'center' : current === 'center' ? 'right' : 'left';
+                  updateSelected({ align: nextAlign });
+                }}
+                className="custom-tool-button h-8 w-8 flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+              >
+                {selectedLayer.align === 'center' ? (
+                  <AlignCenter className="w-4 h-4" />
+                ) : selectedLayer.align === 'right' ? (
+                  <AlignRight className="w-4 h-4" />
+                ) : (
+                  <AlignLeft className="w-4 h-4" />
+                )}
+              </button>
+            </ToolbarTooltip>
+            <ToolbarTooltip label="List">
+              <button
+                type="button"
+                onClick={() => updateSelected({ list: !selectedLayer.list })}
+                className={toggleClass(selectedLayer.list)}
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </ToolbarTooltip>
           </>
         )}
 
         {/* Opacity Checkerboard Button & Popover */}
         {selectedLayer && (
           <div className="custom-opacity-menu relative" ref={opacityMenuRef}>
-            <button
-              type="button"
-              className={`custom-tool-button h-8 w-8 flex items-center justify-center ${
-                isOpacityOpen ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300' : ''
-              }`}
-              onClick={() => {
-                setIsOpacityOpen((prev) => !prev);
-                setIsStrokeOpen(false);
-                setIsRadiusOpen(false);
-              }}
-              title={`Opacity: ${selectedLayer.opacity ?? 100}%`}
-            >
-              {/* Checkerboard square icon */}
-              <span className="w-4 h-4 rounded-[3px] border border-slate-300 dark:border-slate-600 overflow-hidden relative inline-block bg-[linear-gradient(45deg,#ccc_25%,transparent_25%),linear-gradient(-45deg,#ccc_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#ccc_75%),linear-gradient(-45deg,transparent_75%,#ccc_75%)] bg-[size:6px_6px] bg-[position:0_0,0_3px,3px_-3px,-3px_0] dark:bg-[linear-gradient(45deg,#555_25%,transparent_25%),linear-gradient(-45deg,#555_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#555_75%),linear-gradient(-45deg,transparent_75%,#555_75%)]">
-                <span
-                  className="absolute inset-0 bg-slate-900 dark:bg-white"
-                  style={{ opacity: 1 - ((selectedLayer.opacity ?? 100) / 100) }}
-                />
-              </span>
-            </button>
+            <ToolbarTooltip label="Transparency">
+              <button
+                type="button"
+                className={`custom-tool-button h-8 w-8 flex items-center justify-center ${
+                  isOpacityOpen ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300' : ''
+                }`}
+                onClick={() => {
+                  setIsOpacityOpen((prev) => !prev);
+                  setIsStrokeOpen(false);
+                  setIsRadiusOpen(false);
+                }}
+              >
+                {/* Checkerboard square icon */}
+                <span className="w-4 h-4 rounded-[3px] border border-slate-300 dark:border-slate-600 overflow-hidden relative inline-block bg-[linear-gradient(45deg,#ccc_25%,transparent_25%),linear-gradient(-45deg,#ccc_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#ccc_75%),linear-gradient(-45deg,transparent_75%,#ccc_75%)] bg-[size:6px_6px] bg-[position:0_0,0_3px,3px_-3px,-3px_0] dark:bg-[linear-gradient(45deg,#555_25%,transparent_25%),linear-gradient(-45deg,#555_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#555_75%),linear-gradient(-45deg,transparent_75%,#555_75%)]">
+                  <span
+                    className="absolute inset-0 bg-slate-900 dark:bg-white"
+                    style={{ opacity: 1 - ((selectedLayer.opacity ?? 100) / 100) }}
+                  />
+                </span>
+              </button>
+            </ToolbarTooltip>
             {isOpacityOpen && (
               <div className="custom-opacity-dropdown">
                 <div className="flex items-center gap-2 relative z-10">
@@ -2777,48 +2843,51 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
 
         {/* Delete button */}
         {selectedLayer && (
-          <button
-            type="button"
-            onClick={deleteSelected}
-            className={`${iconButton} text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15`}
-            title="Delete element (Delete/Backspace)"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          <ToolbarTooltip label="Delete">
+            <button
+              type="button"
+              onClick={deleteSelected}
+              className={`${iconButton} text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/15`}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </ToolbarTooltip>
         )}
 
         <span className="custom-toolbar-divider" />
 
         {/* Add Text & Add Shape */}
-        <button
-          type="button"
-          onClick={() => addLayer('text')}
-          className={`${iconButton} gap-1.5 px-2.5`}
-          title="Add text"
-        >
-          <Type className="w-4 h-4" />
-          <span className="text-xs font-semibold">Text</span>
-        </button>
-        {/* Add Shape Dropdown */}
-        <div className="relative" ref={shapeMenuRef}>
+        <ToolbarTooltip label="Add text">
           <button
             type="button"
-            onClick={() => {
-              setIsShapeMenuOpen((prev) => !prev);
-              setIsFontOpen(false);
-              setIsStrokeOpen(false);
-              setIsRadiusOpen(false);
-              setIsOpacityOpen(false);
-            }}
-            className={`${iconButton} gap-1.5 px-2.5 ${
-              isShapeMenuOpen ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300' : ''
-            }`}
-            title="Add shape"
+            onClick={() => addLayer('text')}
+            className={`${iconButton} gap-1.5 px-2.5`}
           >
-            <Square className="w-4 h-4" />
-            <span className="text-xs font-semibold">Shape</span>
-            <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isShapeMenuOpen ? 'rotate-180' : ''}`} />
+            <Type className="w-4 h-4" />
+            <span className="text-xs font-semibold">Text</span>
           </button>
+        </ToolbarTooltip>
+        {/* Add Shape Dropdown */}
+        <div className="relative" ref={shapeMenuRef}>
+          <ToolbarTooltip label="Add shape">
+            <button
+              type="button"
+              onClick={() => {
+                setIsShapeMenuOpen((prev) => !prev);
+                setIsFontOpen(false);
+                setIsStrokeOpen(false);
+                setIsRadiusOpen(false);
+                setIsOpacityOpen(false);
+              }}
+              className={`${iconButton} gap-1.5 px-2.5 ${
+                isShapeMenuOpen ? 'bg-orange-100 text-orange-600 dark:bg-orange-500/25 dark:text-orange-300' : ''
+              }`}
+            >
+              <Square className="w-4 h-4" />
+              <span className="text-xs font-semibold">Shape</span>
+              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${isShapeMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+          </ToolbarTooltip>
 
           {isShapeMenuOpen && (
             <div
@@ -3372,7 +3441,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                   onPointerDown={(event) => resizeStart(event, selectedLayer, 'w')}
                   onDoubleClick={(event) => {
                     event.stopPropagation();
-                    autoFitTextWidth(selectedLayer, 'w');
+                    autoFitTextWidth(selectedLayer);
                   }}
                   className="group/handle-w absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-50 select-none"
                   title={selectedLayer.type === 'text' ? 'Drag to resize width, double-click to auto-fit text' : isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
@@ -3388,7 +3457,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                   onPointerDown={(event) => resizeStart(event, selectedLayer, 'e')}
                   onDoubleClick={(event) => {
                     event.stopPropagation();
-                    autoFitTextWidth(selectedLayer, 'e');
+                    autoFitTextWidth(selectedLayer);
                   }}
                   className="group/handle-e absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 flex items-center justify-center cursor-ew-resize pointer-events-auto p-1 z-50 select-none"
                   title={selectedLayer.type === 'text' ? 'Drag to resize width, double-click to auto-fit text' : isUniformShape ? 'Resize' : 'Drag to decrease/increase width'}
