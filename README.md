@@ -1,178 +1,260 @@
 # AI Display Studio
 
-A full-stack application that transforms images and PDFs into stunning laptop display mockups using Python backend for PDF processing and React frontend.
+A full-stack application that transforms images and PDFs into laptop display mockups with live text editing using a Python FastAPI backend and a React (Vite + TypeScript + Tailwind CSS) frontend.
 
-## Architecture
+---
 
-- **Frontend**: React + TypeScript + Tailwind CSS (Vite)
-- **Backend**: Python + FastAPI + PyMuPDF + Pillow
+## 🏗️ Architecture & Tech Stack
 
-## Features
+- **Frontend**: React 18, TypeScript, Tailwind CSS, Vite, Lucide Icons, html2canvas / dom-to-image
+- **Backend**: Python 3.9+, FastAPI, PyMuPDF (`fitz`), Pillow, EasyOCR, OpenCV-headless, Uvicorn
+- **Platform**: Windows 10 / 11
 
-- 🖼️ **Image Processing**: Upload and optimize JPG, PNG, GIF images
-- 📄 **PDF Extraction**: High-quality first page extraction from PDF documents using PyMuPDF
-- 💻 **Laptop Mockup**: Realistic laptop screen display with your content
-- 🚀 **Fast Processing**: Python-powered backend for reliable PDF handling
-- 📱 **Responsive Design**: Works on all device sizes
-- 🔄 **Real-time Status**: Backend connectivity monitoring
+---
 
-## Quick Start
+## 💻 System Prerequisites (Windows)
 
-### 1. Start the Python Backend
+Before starting, make sure the following are installed on your Windows machine:
 
-```bash
-cd backend
+| Requirement | Recommended Version | Download / Check |
+| :--- | :--- | :--- |
+| **Python** | 3.9 to 3.12 | [python.org](https://www.python.org/downloads/) *(⚠️ Check **"Add Python to PATH"** during installation)* |
+| **Node.js & npm** | Node v18+ or v20+ (LTS) | [nodejs.org](https://nodejs.org/) |
+| **Git for Windows**| 2.30+ | [git-scm.com](https://git-scm.com/) |
 
-# Install Python dependencies
-python -m venv venv
-venv\Scripts\activate   # Windows
-pip install -r requirements.txt
-
-# Start the FastAPI server
-python run.py
+Verify in PowerShell or Command Prompt:
+```powershell
+python --version
+node -v
+npm -v
 ```
 
-The backend will be available at `http://localhost:8001`
-- API Documentation: `http://localhost:8001/docs`
+---
+
+## 🚀 Complete Installation & Setup Guide (Windows)
+
+Follow these steps to set up and run the project from scratch on any Windows machine.
+
+### Step 1: Clone the Repository & Configure Environment
+
+1. Open **PowerShell** or **Command Prompt** and clone the repository:
+   ```powershell
+   git clone <YOUR_REPOSITORY_URL>
+   cd Resource_Generative_AI
+   ```
+
+2. Copy the environment variables template to create `.env`:
+   - **PowerShell:**
+     ```powershell
+     Copy-Item .env.example .env
+     ```
+   - **Command Prompt (CMD):**
+     ```cmd
+     copy .env.example .env
+     ```
+
+*(Default settings in `.env` run Backend on port `8001` and allow Frontend on port `5174`)*.
+
+---
+
+### Step 2: Set Up & Start the Python Backend (Terminal 1)
+
+1. Open **Terminal 1** (PowerShell or CMD) and navigate into the `backend` folder:
+   ```powershell
+   cd backend
+   ```
+
+2. Create a virtual environment:
+   ```powershell
+   python -m venv venv
+   ```
+
+3. Activate the virtual environment:
+   - **PowerShell:**
+     ```powershell
+     .\venv\Scripts\Activate.ps1
+     ```
+     *(If you see an execution policy error in PowerShell, run: `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` and then run the activate command again)*
+   - **Command Prompt (CMD):**
+     ```cmd
+     venv\Scripts\activate.bat
+     ```
+
+4. Install backend dependencies:
+   ```powershell
+   python -m pip install --upgrade pip
+   pip install -r requirements.txt
+   ```
+
+5. Start the backend server:
+   ```powershell
+   # Method A (Recommended - runs through run.py with auto-reload):
+   python run.py
+
+   # Method B (Direct Uvicorn command):
+   uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+   ```
+
+> 💡 **What is Uvicorn?**  
+> `uvicorn` is the ASGI web server that executes FastAPI. It is already included in `requirements.txt` and runs behind `python run.py`. You do not need to install anything separately.
+
+✅ **Backend is running at:**
+- Server: `http://localhost:8001`
 - Health Check: `http://localhost:8001/health`
+- Interactive API Docs (Swagger): `http://localhost:8001/docs`
 
-### 2. Start the React Frontend
+> **Note**: On the first time you run OCR text detection, `EasyOCR` will automatically download lightweight pre-trained model weights (~80MB).
 
-```bash
-cd frontend
+---
 
-# Install Node.js dependencies
-npm install
+### Step 3: Set Up & Start the React Frontend (Terminal 2)
 
-# Start the Vite development server
-npm run dev
+1. Open a **new terminal window (Terminal 2)** and navigate into the `frontend` folder:
+   ```powershell
+   cd frontend
+   ```
+
+2. Install Node.js dependencies:
+   ```powershell
+   npm install
+   ```
+
+3. Start the Vite development server:
+   ```powershell
+   npm run dev
+   ```
+
+✅ **Frontend will display both Local and Network IP URLs:**
+- **Local (Same machine):** `http://localhost:5174`
+- **Network (Other devices on your Wi-Fi/LAN):** `http://192.168.x.x:5174`
+
+---
+
+## 🎯 Verification & Testing
+
+1. Open `http://localhost:5174` in your browser.
+2. Check the top-right header: you should see a green **"Connected"** status badge indicating successful communication with the backend.
+3. Test uploading an image or a PDF document to generate a laptop display mockup.
+
+---
+
+## 📁 Project Structure
+
+```
+Resource_Generative_AI/
+├── .env.example              # Environment configuration template
+├── .env                      # Local environment file (git-ignored)
+├── README.md                 # Complete project & setup documentation
+├── backend/
+│   ├── main.py               # FastAPI application endpoints
+│   ├── ocr_processor.py      # EasyOCR detection & text replacement logic
+│   ├── requirements.txt      # Python dependencies
+│   ├── run.py                # Server entry point
+│   └── venv/                 # Virtual environment (git-ignored)
+└── frontend/
+    ├── package.json          # Frontend dependencies & scripts
+    ├── vite.config.ts        # Vite configuration
+    ├── tailwind.config.js    # Tailwind styling config
+    ├── index.html            # App entry point
+    └── src/
+        ├── App.tsx           # Main application UI
+        ├── components/       # UI & canvas components
+        └── utils/            # Brand mockups and PDF helpers
 ```
 
-The frontend will be available at `http://localhost:5174`
+---
 
-## API Endpoints
+## ⚙️ How to Change Ports or Access Over Local Network (LAN)
 
-### Backend (Python FastAPI)
+All port settings and connection URLs are centralized in the `.env` file at the root of the project:
 
-- `GET /` - API status
-- `GET /health` - Health check
-- `POST /extract-pdf-image` - Extract first page from PDF as image
-- `POST /process-image` - Process and optimize images
+### Scenario A: Changing the Backend Port (e.g., from 8001 to 8080)
+1. Open `.env` and change:
+   ```env
+   API_PORT=8080
+   API_BASE_URL=http://localhost:8080
+   VITE_API_BASE_URL=http://localhost:8080
+   ```
+2. Restart backend (`python run.py`) and frontend (`npm run dev`).
 
-### Example Usage
+### Scenario B: Changing the Frontend Port (e.g., from 5174 to 3000)
+1. Start frontend on the desired port:
+   ```powershell
+   cd frontend
+   npm run dev -- --port 3000
+   ```
+2. In `.env`, add the new frontend URL to `CORS_ORIGINS`:
+   ```env
+   CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+   ```
 
-```bash
-# Health check
-curl http://localhost:8001/health
+### Scenario C: Accessing from Another Device on Your Wi-Fi / Local Network
+1. Find your Windows computer's local IP address by running `ipconfig` in PowerShell/CMD (example IP: `192.168.1.50`).
+2. Update `.env`:
+   ```env
+   API_HOST=0.0.0.0
+   API_PORT=8001
+   API_BASE_URL=http://192.168.1.50:8001
+   VITE_API_BASE_URL=http://192.168.1.50:8001
+   CORS_ORIGINS=http://localhost:5174,http://127.0.0.1:5174,http://192.168.1.50:5174
+   ```
+3. Start frontend allowing host binding:
+   ```powershell
+   npm run dev -- --host
+   ```
+4. Now open `http://192.168.1.50:5174` from your phone or any device on the same Wi-Fi network!
 
-# Extract PDF first page
-curl -X POST -F "file=@document.pdf" http://localhost:8001/extract-pdf-image
+---
 
-# Process image
-curl -X POST -F "file=@image.jpg" http://localhost:8001/process-image
-```
+## 🛠️ Windows Troubleshooting & Fixes
 
-## Project Structure
+### 1. PowerShell Script Execution Disabled Error
+- **Error:** `File ...\Activate.ps1 cannot be loaded because running scripts is disabled on this system.`
+- **Fix:** In PowerShell, run:
+  ```powershell
+  Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+  ```
+  Then re-run `.\venv\Scripts\Activate.ps1`.
 
-```
-├── backend/                 # Python FastAPI backend
-│   ├── main.py             # FastAPI application
-│   ├── run.py              # Server startup script
-│   └── requirements.txt    # Python dependencies
-├── frontend/               # React frontend
-│   ├── src/
-│   │   ├── components/     # React components
-│   │   ├── utils/          # Utility functions
-│   │   └── App.tsx         # Main application
-│   ├── public/             # Static assets
-│   └── package.json        # Node.js dependencies
-└── README.md
-```
+### 2. Port Already in Use (Port 8001 or 5174)
+- **Fix for Backend (Port 8001):**
+  Edit `.env` and change `API_PORT=8002` and `VITE_API_BASE_URL=http://localhost:8002`.
+- **Fix for Frontend (Port 5174):**
+  Vite will automatically offer another port (e.g., `5175`). Update `CORS_ORIGINS` in `.env` if you use a different port.
 
-## Dependencies
+### 3. Frontend Shows "Backend Disconnected" (CORS / Connection Issue)
+- Ensure the backend terminal is running and shows no errors.
+- Test if `http://localhost:8001/health` responds with `{"status": "healthy"}` in your browser.
+- Make sure `.env` contains `CORS_ORIGINS=http://localhost:5174,http://127.0.0.1:5174`.
 
-### Backend (Python)
-- **FastAPI**: Modern web framework for APIs
-- **PyMuPDF**: PDF processing and image extraction
-- **Pillow**: Image processing and optimization
-- **Uvicorn**: ASGI server for FastAPI
+### 4. `npm install` Errors on Frontend
+- In PowerShell/CMD:
+  ```powershell
+  npm cache clean --force
+  npm install
+  ```
 
-### Frontend (React)
-- **React 18**: UI framework
-- **TypeScript**: Type safety
-- **Tailwind CSS**: Styling
-- **Vite**: Build tool and dev server
-- **Lucide React**: Icons
+---
 
-## Development
+## 📦 Production Build (Windows)
 
-### Backend Development
-```bash
+### Backend
+```powershell
 cd backend
-pip install -r requirements.txt
-python run.py  # Auto-reload enabled
+.\venv\Scripts\Activate.ps1
+uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4
 ```
 
-### Frontend Development
-```bash
-cd frontend
-npm install
-npm run dev  # Hot reload enabled
-```
-
-### Building for Production
-
-#### Backend
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8001
-```
-
-#### Frontend
-```bash
+### Frontend
+```powershell
 cd frontend
 npm run build
 npm run preview
 ```
+*(The production build output will be in `frontend\dist\`)*.
 
-## Features in Detail
+---
 
-### PDF Processing
-- Uses PyMuPDF for reliable PDF parsing
-- Extracts first page at 300 DPI for high quality
-- Converts to optimized JPEG format
-- Handles various PDF formats and sizes
+## 📜 License
 
-### Image Processing
-- Supports JPG, PNG, GIF formats
-- Automatic format conversion and optimization
-- Resizing for optimal display
-- Quality preservation
-
-### Laptop Mockup
-- Realistic laptop design with proper proportions
-- Responsive scaling for different screen sizes
-- Loading states and error handling
-- Smooth animations and transitions
-
-## Troubleshooting
-
-### Backend Issues
-- Ensure Python 3.8+ is installed
-- Check if all dependencies are installed: `pip install -r requirements.txt`
-- Verify the server is running on port 8001
-
-### Frontend Issues
-- Ensure Node.js 16+ is installed
-- Check if backend is accessible: visit `http://localhost:8001/health`
-- Clear browser cache if experiencing issues
-
-### CORS Issues
-- Backend is configured to allow requests from `localhost:5174`
-- If using different ports, update CORS settings in `backend/main.py`
-
-
-## License
-
-MIT License - feel free to use this project for your own applications!
+MIT License - feel free to use and adapt this project for your needs!

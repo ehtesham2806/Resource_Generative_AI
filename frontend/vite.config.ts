@@ -19,6 +19,7 @@ export default defineConfig({
     global: 'globalThis',
   },
   server: {
+    host: true, // Exposes server to both localhost and local network IP (e.g. http://192.168.x.x:5174)
     port: 5174,
     headers: {
       'Cross-Origin-Embedder-Policy': 'credentialless',

@@ -22,7 +22,6 @@ import {
   MoreVertical,
   Move,
   MoveHorizontal,
-  Plus,
   RotateCw,
   Search,
   Sparkles,
@@ -33,6 +32,8 @@ import {
   Type,
   Underline,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 
 type LayerType = 'image' | 'text' | 'shape';
@@ -361,17 +362,29 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
     const [activeLayerMenuId, setActiveLayerMenuId] = useState<string | null>(null);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [croppingId, setCroppingId] = useState<string | null>(null);
-    const [cropDraft, setCropDraft] = useState<CropData | null>(null);
+    const [cropSession, setCropSession] = useState<{
+      layerId: string;
+      image: { x: number; y: number; width: number; height: number };
+      frame: { x: number; y: number; width: number; height: number };
+      baseImageWidth: number;
+    } | null>(null);
     const [cropImgDims, setCropImgDims] = useState<{ width: number; height: number } | null>(null);
-    const cropOriginalRef = useRef<CropData | null>(null);
+    const [cropAspectRatio, setCropAspectRatio] = useState<string>('free');
+    const [isCropAspectMenuOpen, setIsCropAspectMenuOpen] = useState(false);
+    const cropAspectMenuRef = useRef<HTMLDivElement>(null);
     const cropDragRef = useRef<{
       startX: number;
       startY: number;
-      startImgLeft: number;
-      startImgTop: number;
-      baseImgW: number;
-      baseImgH: number;
-      frameRect: DOMRect;
+      startImgX: number;
+      startImgY: number;
+      canvasRect: DOMRect;
+    } | null>(null);
+    const cropHandleDragRef = useRef<{
+      handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e';
+      startX: number;
+      startY: number;
+      startFrame: { x: number; y: number; width: number; height: number };
+      canvasRect: DOMRect;
     } | null>(null);
     const [past, setPast] = useState<DesignLayer[][]>([]);
     const [future, setFuture] = useState<DesignLayer[][]>([]);
@@ -391,7 +404,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
     const opacityMenuRef = useRef<HTMLDivElement>(null);
     const strokeMenuRef = useRef<HTMLDivElement>(null);
     const radiusMenuRef = useRef<HTMLDivElement>(null);
-    const canvasRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLDivElement | null>(null);
     const dragRef = useRef<{
       id: string;
       startX: number;
@@ -734,50 +747,87 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       const dims = await getImageDimensions(baseSrc);
       setCropImgDims(dims);
 
-      let initialCrop: CropData;
-      if (target.cropData) {
-        initialCrop = { ...target.cropData };
-      } else {
-        const layerPixelW = (target.width / 100) * outputWidth;
-        const layerPixelH = (target.height / 100) * outputHeight;
-        const layerAspect = layerPixelW / Math.max(1, layerPixelH);
-        const imgAspect = dims.width / Math.max(1, dims.height);
+      const imgAspect = dims.width / Math.max(1, dims.height);
+      const canvasAspect = outputWidth / Math.max(1, outputHeight);
 
-        if (imgAspect > layerAspect) {
-          const w = (layerAspect / imgAspect) * 100;
-          initialCrop = { x: (100 - w) / 2, y: 0, width: w, height: 100 };
-        } else if (imgAspect < layerAspect) {
-          const h = (imgAspect / layerAspect) * 100;
-          initialCrop = { x: 0, y: (100 - h) / 2, width: 100, height: h };
+      const frame = {
+        x: target.x,
+        y: target.y,
+        width: target.width,
+        height: target.height,
+      };
+
+      let image = { x: target.x, y: target.y, width: target.width, height: target.height };
+      let baseImageWidth = target.width;
+
+      if (target.cropData) {
+        const cd = target.cropData;
+        const imgW = frame.width / Math.max(0.01, cd.width / 100);
+        const imgH = (imgW * canvasAspect) / imgAspect;
+        const imgX = frame.x - (cd.x / 100) * imgW;
+        const imgY = frame.y - (cd.y / 100) * imgH;
+        image = { x: imgX, y: imgY, width: imgW, height: imgH };
+        baseImageWidth = Math.max(frame.width, (frame.height * (outputHeight / outputWidth)) * imgAspect);
+      } else {
+        const framePixelW = (frame.width / 100) * outputWidth;
+        const framePixelH = (frame.height / 100) * outputHeight;
+        const frameAspect = framePixelW / Math.max(1, framePixelH);
+
+        if (imgAspect >= frameAspect) {
+          const imgH = frame.height;
+          const imgW = (frame.height * (outputHeight / outputWidth)) * imgAspect;
+          const imgY = frame.y;
+          const imgX = frame.x - (imgW - frame.width) / 2;
+          image = { x: imgX, y: imgY, width: imgW, height: imgH };
+          baseImageWidth = imgW;
         } else {
-          initialCrop = { x: 0, y: 0, width: 100, height: 100 };
+          const imgW = frame.width;
+          const imgH = (frame.width * (outputWidth / outputHeight)) / imgAspect;
+          const imgX = frame.x;
+          const imgY = frame.y - (imgH - frame.height) / 2;
+          image = { x: imgX, y: imgY, width: imgW, height: imgH };
+          baseImageWidth = imgW;
         }
       }
 
-      cropOriginalRef.current = initialCrop;
-      setCropDraft(initialCrop);
+      setCropSession({
+        layerId,
+        image,
+        frame,
+        baseImageWidth: Math.max(frame.width, (frame.height * (outputHeight / outputWidth)) * imgAspect, baseImageWidth),
+      });
       setCroppingId(layerId);
+      setCropAspectRatio('free');
       setSelectedIds([layerId]);
       setIsStrokeOpen(false);
       setIsRadiusOpen(false);
       setIsOpacityOpen(false);
       setIsPositionOpen(false);
+      setIsCropAspectMenuOpen(false);
     };
 
     const applyCrop = async () => {
-      if (!croppingId || !cropDraft) return;
+      if (!croppingId || !cropSession || !cropImgDims) return;
       const targetLayer = layers.find((l) => l.id === croppingId);
       if (!targetLayer || !targetLayer.src) return;
 
       pushHistory(layers);
 
-      const isFull =
-        Math.abs(cropDraft.x) < 0.01 &&
-        Math.abs(cropDraft.y) < 0.01 &&
-        Math.abs(cropDraft.width - 100) < 0.01 &&
-        Math.abs(cropDraft.height - 100) < 0.01;
-
+      const { image, frame } = cropSession;
       const baseSrc = targetLayer.originalSrc || targetLayer.src;
+
+      const cropData: CropData = {
+        x: Math.max(0, Math.min(100, ((frame.x - image.x) / image.width) * 100)),
+        y: Math.max(0, Math.min(100, ((frame.y - image.y) / image.height) * 100)),
+        width: Math.max(1, Math.min(100, (frame.width / image.width) * 100)),
+        height: Math.max(1, Math.min(100, (frame.height / image.height) * 100)),
+      };
+
+      const isFull =
+        cropData.x < 0.01 &&
+        cropData.y < 0.01 &&
+        Math.abs(cropData.width - 100) < 0.01 &&
+        Math.abs(cropData.height - 100) < 0.01;
 
       if (isFull) {
         setLayers((current) =>
@@ -785,6 +835,10 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             l.id === croppingId
               ? {
                   ...l,
+                  x: frame.x,
+                  y: frame.y,
+                  width: frame.width,
+                  height: frame.height,
                   src: baseSrc,
                   originalSrc: undefined,
                   cropData: undefined,
@@ -793,16 +847,19 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           )
         );
       } else {
-        const croppedSrc = await cropImageToDataUrl(baseSrc, cropDraft);
-
+        const croppedSrc = await cropImageToDataUrl(baseSrc, cropData);
         setLayers((current) =>
           current.map((l) =>
             l.id === croppingId
               ? {
                   ...l,
+                  x: frame.x,
+                  y: frame.y,
+                  width: frame.width,
+                  height: frame.height,
                   src: croppedSrc,
                   originalSrc: baseSrc,
-                  cropData: cropDraft,
+                  cropData,
                 }
               : l
           )
@@ -810,124 +867,166 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       }
 
       setCroppingId(null);
-      setCropDraft(null);
+      setCropSession(null);
       setCropImgDims(null);
-      cropOriginalRef.current = null;
+      setIsCropAspectMenuOpen(false);
     };
 
     const resetCrop = () => {
-      if (!croppingId) return;
+      if (!croppingId || !cropSession) return;
+      const targetLayer = layers.find((l) => l.id === croppingId);
+      const baseSrc = targetLayer?.originalSrc || targetLayer?.src;
       pushHistory(layers);
+
       setLayers((current) =>
         current.map((l) =>
           l.id === croppingId
             ? {
                 ...l,
-                src: l.originalSrc || l.src,
+                x: cropSession.image.x,
+                y: cropSession.image.y,
+                width: cropSession.image.width,
+                height: cropSession.image.height,
+                src: baseSrc || l.src,
                 originalSrc: undefined,
                 cropData: undefined,
               }
             : l
         )
       );
+
       setCroppingId(null);
-      setCropDraft(null);
+      setCropSession(null);
       setCropImgDims(null);
-      cropOriginalRef.current = null;
+      setIsCropAspectMenuOpen(false);
     };
 
     const cancelCrop = () => {
       setCroppingId(null);
-      setCropDraft(null);
+      setCropSession(null);
       setCropImgDims(null);
-      cropOriginalRef.current = null;
+      setIsCropAspectMenuOpen(false);
     };
 
-    const getCropImageLayout = (layer: DesignLayer, draft: CropData | null) => {
-      if (!cropImgDims) {
-        return { imgLeft: 0, imgTop: 0, baseImgW: 100, baseImgH: 100 };
-      }
-      const layerPixelW = (layer.width / 100) * outputWidth;
-      const layerPixelH = (layer.height / 100) * outputHeight;
-      const frameAspect = layerPixelW / Math.max(1, layerPixelH);
+    const setCropZoom = (newZoomPercent: number) => {
+      if (!cropSession || !cropImgDims) return;
+      const clampedZoom = Math.max(100, Math.min(400, newZoomPercent));
+      const scale = clampedZoom / 100;
+
       const imgAspect = cropImgDims.width / Math.max(1, cropImgDims.height);
+      const newW = cropSession.baseImageWidth * scale;
+      const newH = (newW * (outputWidth / outputHeight)) / imgAspect;
 
-      let baseImgW = 100;
-      let baseImgH = 100;
-      if (imgAspect >= frameAspect) {
-        baseImgW = (imgAspect / frameAspect) * 100;
-        baseImgH = 100;
-      } else {
-        baseImgW = 100;
-        baseImgH = (frameAspect / imgAspect) * 100;
-      }
+      const centerX = cropSession.frame.x + cropSession.frame.width / 2;
+      const centerY = cropSession.frame.y + cropSession.frame.height / 2;
 
-      const crop = draft || {
-        x: (100 - (100 / baseImgW) * 100) / 2,
-        y: (100 - (100 / baseImgH) * 100) / 2,
-        width: (100 / baseImgW) * 100,
-        height: (100 / baseImgH) * 100,
-      };
+      const currentW = Math.max(0.1, cropSession.image.width);
+      const currentH = Math.max(0.1, cropSession.image.height);
 
-      const imgLeft = -(crop.x / 100) * baseImgW;
-      const imgTop = -(crop.y / 100) * baseImgH;
+      const ratioX = (centerX - cropSession.image.x) / currentW;
+      const ratioY = (centerY - cropSession.image.y) / currentH;
 
-      return { imgLeft, imgTop, baseImgW, baseImgH };
+      let newX = centerX - ratioX * newW;
+      let newY = centerY - ratioY * newH;
+
+      const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+      newX = clamp(newX, cropSession.frame.x + cropSession.frame.width - newW, cropSession.frame.x);
+      newY = clamp(newY, cropSession.frame.y + cropSession.frame.height - newH, cropSession.frame.y);
+
+      setCropSession({
+        ...cropSession,
+        image: { x: newX, y: newY, width: newW, height: newH },
+      });
     };
 
-    const handleCropPointerDown = (event: React.PointerEvent, layer: DesignLayer) => {
+    const setCropAspectPreset = (preset: string) => {
+      if (!cropSession || !cropImgDims) return;
+      setCropAspectRatio(preset);
+      setIsCropAspectMenuOpen(false);
+
+      if (preset === 'free') return;
+
+      const imgAspect = cropImgDims.width / Math.max(1, cropImgDims.height);
+      let targetAspect = 1;
+
+      if (preset === 'original') {
+        targetAspect = imgAspect;
+      } else if (preset === '1:1') {
+        targetAspect = 1;
+      } else if (preset === '16:9') {
+        targetAspect = 16 / 9;
+      } else if (preset === '4:3') {
+        targetAspect = 4 / 3;
+      } else if (preset === '3:2') {
+        targetAspect = 3 / 2;
+      } else if (preset === '9:16') {
+        targetAspect = 9 / 16;
+      }
+
+      const { image, frame } = cropSession;
+      const centerX = frame.x + frame.width / 2;
+      const centerY = frame.y + frame.height / 2;
+
+      let newW = frame.width;
+      let newH = (newW * outputWidth) / (targetAspect * outputHeight);
+
+      if (newH > image.height) {
+        newH = image.height;
+        newW = (newH * outputHeight * targetAspect) / outputWidth;
+      }
+      if (newW > image.width) {
+        newW = image.width;
+        newH = (newW * outputWidth) / (targetAspect * outputHeight);
+      }
+
+      const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+      const newX = clamp(centerX - newW / 2, image.x, image.x + image.width - newW);
+      const newY = clamp(centerY - newH / 2, image.y, image.y + image.height - newH);
+
+      setCropSession((prev) => (prev ? { ...prev, frame: { x: newX, y: newY, width: newW, height: newH } } : null));
+    };
+
+    const handleCropPointerDown = (event: React.PointerEvent) => {
       event.stopPropagation();
       event.preventDefault();
-      if (!cropImgDims) return;
+      if (!cropSession || !cropImgDims) return;
 
-      const frameEl =
-        (event.currentTarget as HTMLElement).closest('[data-crop-frame="true"]') ||
-        (event.currentTarget as HTMLElement);
-      const frameRect = frameEl.getBoundingClientRect();
-      if (!frameRect || frameRect.width <= 0 || frameRect.height <= 0) return;
-
-      const { imgLeft, imgTop, baseImgW, baseImgH } = getCropImageLayout(layer, cropDraft);
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      if (!canvasRect || canvasRect.width <= 0 || canvasRect.height <= 0) return;
 
       cropDragRef.current = {
         startX: event.clientX,
         startY: event.clientY,
-        startImgLeft: imgLeft,
-        startImgTop: imgTop,
-        baseImgW,
-        baseImgH,
-        frameRect,
+        startImgX: cropSession.image.x,
+        startImgY: cropSession.image.y,
+        canvasRect,
       };
 
       (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
     };
 
     const handleCropPointerMove = (event: React.PointerEvent) => {
-      if (!cropDragRef.current) return;
+      if (!cropDragRef.current || !cropSession) return;
       event.stopPropagation();
       event.preventDefault();
 
-      const { startX, startY, startImgLeft, startImgTop, baseImgW, baseImgH, frameRect } = cropDragRef.current;
-      if (!frameRect || frameRect.width <= 0 || frameRect.height <= 0) return;
+      const { startX, startY, startImgX, startImgY, canvasRect } = cropDragRef.current;
+      if (!canvasRect || canvasRect.width <= 0 || canvasRect.height <= 0) return;
 
-      const deltaXPercent = ((event.clientX - startX) / frameRect.width) * 100;
-      const deltaYPercent = ((event.clientY - startY) / frameRect.height) * 100;
+      const dxPercent = ((event.clientX - startX) / canvasRect.width) * 100;
+      const dyPercent = ((event.clientY - startY) / canvasRect.height) * 100;
 
       const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
-      const minImgLeft = -(baseImgW - 100);
-      const minImgTop = -(baseImgH - 100);
+      const minX = cropSession.frame.x + cropSession.frame.width - cropSession.image.width;
+      const maxX = cropSession.frame.x;
+      const minY = cropSession.frame.y + cropSession.frame.height - cropSession.image.height;
+      const maxY = cropSession.frame.y;
 
-      const newImgLeft = clamp(startImgLeft + deltaXPercent, minImgLeft, 0);
-      const newImgTop = clamp(startImgTop + deltaYPercent, minImgTop, 0);
+      const newX = clamp(startImgX + dxPercent, minX, maxX);
+      const newY = clamp(startImgY + dyPercent, minY, maxY);
 
-      const nextCrop: CropData = {
-        x: clamp((-newImgLeft / baseImgW) * 100, 0, 100),
-        y: clamp((-newImgTop / baseImgH) * 100, 0, 100),
-        width: clamp((100 / baseImgW) * 100, 1, 100),
-        height: clamp((100 / baseImgH) * 100, 1, 100),
-      };
-
-      setCropDraft(nextCrop);
+      setCropSession((prev) => (prev ? { ...prev, image: { ...prev.image, x: newX, y: newY } } : null));
     };
 
     const handleCropPointerUp = (event: React.PointerEvent) => {
@@ -942,6 +1041,97 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       }
     };
 
+    const handleCropHandlePointerDown = (
+      event: React.PointerEvent,
+      handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'w' | 'e'
+    ) => {
+      event.stopPropagation();
+      event.preventDefault();
+      if (!cropSession || !cropImgDims) return;
+
+      const canvasRect = canvasRef.current?.getBoundingClientRect();
+      if (!canvasRect || canvasRect.width <= 0 || canvasRect.height <= 0) return;
+
+      cropHandleDragRef.current = {
+        handle,
+        startX: event.clientX,
+        startY: event.clientY,
+        startFrame: { ...cropSession.frame },
+        canvasRect,
+      };
+
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    };
+
+    const handleCropHandlePointerMove = (event: React.PointerEvent) => {
+      if (!cropHandleDragRef.current || !cropSession) return;
+      event.stopPropagation();
+      event.preventDefault();
+
+      const { handle, startX, startY, startFrame, canvasRect } = cropHandleDragRef.current;
+      if (!canvasRect || canvasRect.width <= 0 || canvasRect.height <= 0) return;
+
+      const dx = ((event.clientX - startX) / canvasRect.width) * 100;
+      const dy = ((event.clientY - startY) / canvasRect.height) * 100;
+
+      const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+      const minSize = 2; // minimum 2% of canvas
+
+      let { x, y, width, height } = startFrame;
+      const { image } = cropSession;
+
+      if (handle.includes('e')) {
+        const maxW = (image.x + image.width) - startFrame.x;
+        width = clamp(startFrame.width + dx, minSize, maxW);
+      }
+      if (handle.includes('w')) {
+        const minX = image.x;
+        const maxX = startFrame.x + startFrame.width - minSize;
+        const newX = clamp(startFrame.x + dx, minX, maxX);
+        width = startFrame.width + (startFrame.x - newX);
+        x = newX;
+      }
+      if (handle.includes('s')) {
+        const maxH = (image.y + image.height) - startFrame.y;
+        height = clamp(startFrame.height + dy, minSize, maxH);
+      }
+      if (handle.includes('n')) {
+        const minY = image.y;
+        const maxY = startFrame.y + startFrame.height - minSize;
+        const newY = clamp(startFrame.y + dy, minY, maxY);
+        height = startFrame.height + (startFrame.y - newY);
+        y = newY;
+      }
+
+      setCropSession((prev) => (prev ? { ...prev, frame: { x, y, width, height } } : null));
+    };
+
+    const handleCropHandlePointerUp = (event: React.PointerEvent) => {
+      if (cropHandleDragRef.current) {
+        event.stopPropagation();
+        try {
+          (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+        } catch {
+          // ignore
+        }
+        cropHandleDragRef.current = null;
+      }
+    };
+
+    const handleCropWheel = (event: React.WheelEvent) => {
+      if (!croppingId || !cropSession || !cropImgDims) return;
+      event.stopPropagation();
+      event.preventDefault();
+
+      const currentZoom = Math.round((cropSession.image.width / Math.max(0.1, cropSession.baseImageWidth)) * 100);
+      const delta = event.deltaY < 0 ? 10 : -10;
+      setCropZoom(currentZoom + delta);
+    };
+
+    const cropZoomPercent = cropSession
+      ? Math.max(100, Math.min(400, Math.round((cropSession.image.width / Math.max(0.1, cropSession.baseImageWidth)) * 100)))
+      : 100;
+
     useEffect(() => {
       const handleKeyDown = (e: KeyboardEvent) => {
         if (!croppingId) return;
@@ -955,7 +1145,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
       };
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [croppingId, cropDraft, layers]);
+    }, [croppingId, cropSession, layers]);
 
     const addShape = (shapeType: ShapeType = 'rectangle') => {
       pushHistory(layers);
@@ -1551,8 +1741,8 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
           else if (resize.corner === 'ne') scale = Math.max(0.1, 1 + (pixelDx - pixelDy) / 200);
           else if (resize.corner === 'sw') scale = Math.max(0.1, 1 - (pixelDx - pixelDy) / 200);
 
-          const anchorX = resize.corner.includes('w') ? resize.groupMinX! + resize.groupWidth : resize.groupMinX!;
-          const anchorY = resize.corner.includes('n') ? resize.groupMinY! + resize.groupHeight : resize.groupMinY!;
+          const anchorX = resize.corner.includes('w') ? (resize.groupMinX ?? 0) + (resize.groupWidth ?? 0) : (resize.groupMinX ?? 0);
+          const anchorY = resize.corner.includes('n') ? (resize.groupMinY ?? 0) + (resize.groupHeight ?? 0) : (resize.groupMinY ?? 0);
 
           setLayers((current) =>
             current.map((layer) => {
@@ -2451,6 +2641,85 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             </ToolbarTooltip>
             {croppingId === selectedLayer.id && (
               <>
+                {/* Aspect Ratio Options Dropdown */}
+                <div className="relative" ref={cropAspectMenuRef}>
+                  <ToolbarTooltip label="Crop aspect ratio presets">
+                    <button
+                      type="button"
+                      onClick={() => setIsCropAspectMenuOpen((prev) => !prev)}
+                      className="custom-tool-button h-8 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Crop className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                      <span className="capitalize">{cropAspectRatio === 'free' ? 'Freeform' : cropAspectRatio}</span>
+                      <ChevronDown className="w-3 h-3 opacity-60" />
+                    </button>
+                  </ToolbarTooltip>
+
+                  {isCropAspectMenuOpen && (
+                    <div
+                      className="absolute top-full mt-1.5 left-0 z-50 w-44 bg-white dark:bg-[#121226] border border-slate-200/90 dark:border-slate-700/90 rounded-xl shadow-2xl p-1.5 flex flex-col gap-0.5 mockup-popover-exclude"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {[
+                        { id: 'free', label: 'Freeform' },
+                        { id: 'original', label: 'Original Ratio' },
+                        { id: '1:1', label: '1:1 (Square)' },
+                        { id: '16:9', label: '16:9 (Landscape)' },
+                        { id: '4:3', label: '4:3 (Standard)' },
+                        { id: '3:2', label: '3:2 (Classic)' },
+                        { id: '9:16', label: '9:16 (Story/Reel)' },
+                      ].map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setCropAspectPreset(item.id)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                            cropAspectRatio === item.id
+                              ? 'bg-purple-50 dark:bg-purple-950/60 text-purple-600 dark:text-purple-300 font-semibold'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span>{item.label}</span>
+                          {cropAspectRatio === item.id && <Check className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Zoom Controls in Top Toolbar */}
+                <div className="flex items-center gap-1 px-2 h-8 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setCropZoom(cropZoomPercent - 20)}
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer"
+                    title="Decrease / Zoom Out"
+                  >
+                    <ZoomOut className="w-3.5 h-3.5" />
+                  </button>
+                  <input
+                    type="range"
+                    min={100}
+                    max={400}
+                    step={5}
+                    value={cropZoomPercent}
+                    onChange={(e) => setCropZoom(Number(e.target.value))}
+                    className="w-16 accent-purple-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                    title={`Zoom: ${cropZoomPercent}%`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setCropZoom(cropZoomPercent + 20)}
+                    className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 cursor-pointer"
+                    title="Increase / Zoom In"
+                  >
+                    <ZoomIn className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[10px] font-mono text-slate-600 dark:text-slate-400 w-7 text-center">
+                    {cropZoomPercent}%
+                  </span>
+                </div>
+
                 <ToolbarTooltip label="Reset crop">
                   <button
                     type="button"
@@ -2968,7 +3237,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             backgroundPosition: 'center',
             border: 'none',
             outline: 'none',
-            overflow: croppingId ? 'visible' : 'hidden',
+            overflow: 'visible',
           }}
           onPointerDown={(event) => {
             if (event.target === event.currentTarget) {
@@ -3048,104 +3317,115 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
             />
           )}
 
-          {backgroundColor === 'transparent' && !backgroundImage && (
-            <div className="absolute inset-0 bg-grid-pattern opacity-50 pointer-events-none" />
-          )}
-          {isLoading && (
-            <div className="absolute inset-0 z-20 grid place-items-center bg-black/20 text-xs text-white">
-              Preparing image...
-            </div>
-          )}
-          {layers.map((layer, index) =>
-            layer.id === 'source-image' && hideSourceImage ? null : (
-              <div
-                key={layer.id}
-                data-layer-id={layer.id}
-                data-crop-container={croppingId === layer.id ? 'true' : undefined}
-                onPointerDown={(event) => {
-                  if (croppingId !== layer.id) {
-                    pointerDown(event, layer);
-                  }
-                }}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  if (croppingId === layer.id) return;
-                  if (croppingId && croppingId !== layer.id) {
-                    applyCrop();
-                  }
-                  if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
-                    if (!hasDraggedRef.current) {
-                      setSelectedIds([layer.id]);
+          {/* Canvas Artboard Base / Layers Viewport: clips element graphics to the frame boundary unless in crop mode */}
+          <div
+            className={`absolute inset-0 pointer-events-none ${
+              croppingId ? 'overflow-visible' : 'overflow-hidden'
+            }`}
+            style={{
+              borderRadius: 'inherit',
+            }}
+          >
+            {backgroundColor === 'transparent' && !backgroundImage && (
+              <div className="absolute inset-0 bg-grid-pattern opacity-50 pointer-events-none" />
+            )}
+            {isLoading && (
+              <div className="absolute inset-0 z-20 grid place-items-center bg-black/20 text-xs text-white">
+                Preparing image...
+              </div>
+            )}
+            {layers.map((layer, index) =>
+              layer.id === 'source-image' && hideSourceImage ? null : (
+                <div
+                  key={layer.id}
+                  data-layer-id={layer.id}
+                  data-crop-container={croppingId === layer.id ? 'true' : undefined}
+                  onPointerDown={(event) => {
+                    if (croppingId !== layer.id) {
+                      pointerDown(event, layer);
                     }
-                  }
-                }}
-                onDoubleClick={(event) => {
-                  event.stopPropagation();
-                  setSelectedId(layer.id);
-                  if (layer.type === 'text') {
-                    textEditStartSnapshotRef.current = layers;
-                    setEditingId(layer.id);
-                  } else if (layer.type === 'image') {
-                    startCropping(layer.id);
-                  }
-                }}
-                onContextMenu={(event) => event.preventDefault()}
-                className={`absolute ${editingId === layer.id ? 'cursor-text select-text' : croppingId === layer.id ? 'cursor-default' : 'cursor-move select-none'} ${
-                  selectedIds.includes(layer.id) && croppingId !== layer.id ? 'custom-selected-element' : ''
-                }`}
-                style={{
-                  left: `${layer.x}%`,
-                  top: `${layer.y}%`,
-                  width: `${layer.width}%`,
-                  height: layer.type === 'text' ? 'auto' : `${layer.height}%`,
-                  zIndex: croppingId === layer.id ? 40 : index + 1,
-                  transform: layer.rotation ? `rotate(${layer.rotation}deg)` : undefined,
-                  transformOrigin: 'center center',
-                  opacity: (layer.opacity ?? 100) / 100,
-                  borderRadius:
-                    layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
-                      ? `${layer.radius || 0}px`
-                      : undefined,
-                  backgroundColor:
-                    layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
-                      ? layer.fill
-                      : undefined,
-                  border:
-                    layer.type === 'image' || (layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle'))
-                      ? layer.strokeWidth && layer.strokeWidth > 0 && layer.strokeStyle !== 'none'
-                        ? `${layer.strokeWidth}px ${
-                            layer.strokeStyle === 'dashed-wide' || layer.strokeStyle === 'dashed'
-                              ? 'dashed'
-                              : layer.strokeStyle === 'dotted'
-                              ? 'dotted'
-                              : 'solid'
-                          } ${layer.stroke || '#7c3aed'}`
-                        : undefined
-                      : undefined,
-                }}
-              >
-                {layer.type === 'image' && layer.src && (
-                  croppingId === layer.id && cropDraft ? (() => {
-                    const { imgLeft, imgTop, baseImgW, baseImgH } = getCropImageLayout(layer, cropDraft);
-                    return (
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (croppingId === layer.id) return;
+                    if (croppingId && croppingId !== layer.id) {
+                      applyCrop();
+                    }
+                    if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
+                      if (!hasDraggedRef.current) {
+                        setSelectedIds([layer.id]);
+                      }
+                    }
+                  }}
+                  onDoubleClick={(event) => {
+                    event.stopPropagation();
+                    setSelectedId(layer.id);
+                    if (layer.type === 'text') {
+                      textEditStartSnapshotRef.current = layers;
+                      setEditingId(layer.id);
+                    } else if (layer.type === 'image') {
+                      startCropping(layer.id);
+                    }
+                  }}
+                  onContextMenu={(event) => event.preventDefault()}
+                  className={`absolute ${editingId === layer.id ? 'cursor-text select-text' : croppingId === layer.id ? 'cursor-default' : 'cursor-move select-none'} ${
+                    selectedIds.includes(layer.id) && croppingId !== layer.id ? 'custom-selected-element' : ''
+                  }`}
+                  style={{
+                    left: croppingId === layer.id ? 0 : `${layer.x}%`,
+                    top: croppingId === layer.id ? 0 : `${layer.y}%`,
+                    width: croppingId === layer.id ? '100%' : `${layer.width}%`,
+                    height: croppingId === layer.id ? '100%' : layer.type === 'text' ? 'auto' : `${layer.height}%`,
+                    zIndex: croppingId === layer.id ? 40 : index + 1,
+                    pointerEvents: croppingId === layer.id ? 'none' : 'auto',
+                    transform: croppingId !== layer.id && layer.rotation ? `rotate(${layer.rotation}deg)` : undefined,
+                    transformOrigin: 'center center',
+                    opacity: croppingId === layer.id ? 1 : (layer.opacity ?? 100) / 100,
+                    borderRadius:
+                      layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
+                        ? `${layer.radius || 0}px`
+                        : undefined,
+                    backgroundColor:
+                      layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')
+                        ? layer.fill
+                        : undefined,
+                    border:
+                      croppingId !== layer.id &&
+                      (layer.type === 'image' || (layer.type === 'shape' && (!layer.shapeType || layer.shapeType === 'rectangle')))
+                        ? layer.strokeWidth && layer.strokeWidth > 0 && layer.strokeStyle !== 'none'
+                          ? `${layer.strokeWidth}px ${
+                              layer.strokeStyle === 'dashed-wide' || layer.strokeStyle === 'dashed'
+                                ? 'dashed'
+                                : layer.strokeStyle === 'dotted'
+                                ? 'dotted'
+                                : 'solid'
+                            } ${layer.stroke || '#7c3aed'}`
+                          : undefined
+                        : undefined,
+                  }}
+                >
+                  {layer.type === 'image' && layer.src && (
+                    croppingId === layer.id && cropSession ? (
                       <div
-                        className="w-full h-full relative select-none overflow-visible"
+                        className="w-full h-full relative select-none overflow-visible pointer-events-none"
                         data-crop-frame="true"
+                        onWheel={handleCropWheel}
                       >
-                        {/* 1. Base Dimmed Image Background - full image extending outside the frame */}
+                        {/* 1. Base Dimmed Image Background - full natural image in canvas space */}
                         <div
                           className="absolute select-none pointer-events-auto cursor-grab active:cursor-grabbing shadow-2xl rounded-sm overflow-hidden"
                           style={{
-                            left: `${imgLeft}%`,
-                            top: `${imgTop}%`,
-                            width: `${baseImgW}%`,
-                            height: `${baseImgH}%`,
+                            left: `${cropSession.image.x}%`,
+                            top: `${cropSession.image.y}%`,
+                            width: `${cropSession.image.width}%`,
+                            height: `${cropSession.image.height}%`,
                           }}
-                          onPointerDown={(e) => handleCropPointerDown(e, layer)}
+                          onPointerDown={handleCropPointerDown}
                           onPointerMove={handleCropPointerMove}
                           onPointerUp={handleCropPointerUp}
                           onPointerCancel={handleCropPointerUp}
                           onClick={(e) => e.stopPropagation()}
+                          title="Drag to pan image inside crop"
                         >
                           <img
                             src={layer.originalSrc || layer.src}
@@ -3156,10 +3436,16 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                           <div className="absolute inset-0 bg-slate-900/40 pointer-events-none" />
                         </div>
 
-                        {/* 2. Fixed Frame Viewport (stationary on canvas) with Bright Image inside */}
+                        {/* 2. Fixed Frame Viewport (Adjustable on canvas) with Bright Image inside */}
                         <div
-                          className="absolute inset-0 overflow-hidden select-none pointer-events-auto cursor-grab active:cursor-grabbing border-2 border-purple-500 shadow-2xl z-20"
-                          onPointerDown={(e) => handleCropPointerDown(e, layer)}
+                          className="absolute overflow-hidden select-none pointer-events-auto cursor-grab active:cursor-grabbing border-2 border-purple-600 shadow-2xl z-20"
+                          style={{
+                            left: `${cropSession.frame.x}%`,
+                            top: `${cropSession.frame.y}%`,
+                            width: `${cropSession.frame.width}%`,
+                            height: `${cropSession.frame.height}%`,
+                          }}
+                          onPointerDown={handleCropPointerDown}
                           onPointerMove={handleCropPointerMove}
                           onPointerUp={handleCropPointerUp}
                           onPointerCancel={handleCropPointerUp}
@@ -3168,15 +3454,16 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                             applyCrop();
                           }}
                           onClick={(e) => e.stopPropagation()}
+                          title="Drag to reposition image inside crop • Double-click to apply"
                         >
-                          {/* Crisp Clear Image inside the stationary frame */}
+                          {/* Crisp Clear Image inside the frame */}
                           <div
                             className="absolute pointer-events-none select-none"
                             style={{
-                              left: `${imgLeft}%`,
-                              top: `${imgTop}%`,
-                              width: `${baseImgW}%`,
-                              height: `${baseImgH}%`,
+                              left: `${((cropSession.image.x - cropSession.frame.x) / cropSession.frame.width) * 100}%`,
+                              top: `${((cropSession.image.y - cropSession.frame.y) / cropSession.frame.height) * 100}%`,
+                              width: `${(cropSession.image.width / cropSession.frame.width) * 100}%`,
+                              height: `${(cropSession.image.height / cropSession.frame.height) * 100}%`,
                             }}
                           >
                             <img
@@ -3187,7 +3474,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                             />
                           </div>
 
-                          {/* 3x3 Rule-of-Thirds Grid Lines on the stationary frame */}
+                          {/* 3x3 Rule-of-Thirds Grid Lines */}
                           <div className="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3 z-10">
                             <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
                             <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
@@ -3199,26 +3486,82 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                             <div className="border-r border-b border-white/70 shadow-[0_0_1px_rgba(0,0,0,0.6)]" />
                             <div />
                           </div>
+
+                          {/* 4 Corner Round Handles */}
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'nw')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-purple-600 rounded-full z-30 shadow-md cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag corner to expand/shrink crop"
+                          />
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'ne')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-white border-2 border-purple-600 rounded-full z-30 shadow-md cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag corner to expand/shrink crop"
+                          />
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'sw')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-4 h-4 bg-white border-2 border-purple-600 rounded-full z-30 shadow-md cursor-nesw-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag corner to expand/shrink crop"
+                          />
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'se')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-4 h-4 bg-white border-2 border-purple-600 rounded-full z-30 shadow-md cursor-nwse-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag corner to expand/shrink crop"
+                          />
+
+                          {/* 4 Edge Pill Handles */}
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'n')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-2 bg-white border-2 border-purple-600 rounded-full z-30 shadow-sm cursor-ns-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag top edge to crop height"
+                          />
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 's')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-5 h-2 bg-white border-2 border-purple-600 rounded-full z-30 shadow-sm cursor-ns-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag bottom edge to crop height"
+                          />
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'w')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-2 h-5 bg-white border-2 border-purple-600 rounded-full z-30 shadow-sm cursor-ew-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag left edge to crop width"
+                          />
+                          <div
+                            onPointerDown={(e) => handleCropHandlePointerDown(e, 'e')}
+                            onPointerMove={handleCropHandlePointerMove}
+                            onPointerUp={handleCropHandlePointerUp}
+                            onPointerCancel={handleCropHandlePointerUp}
+                            className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-2 h-5 bg-white border-2 border-purple-600 rounded-full z-30 shadow-sm cursor-ew-resize pointer-events-auto hover:scale-125 transition-transform"
+                            title="Drag right edge to crop width"
+                          />
                         </div>
-
-                        {/* 4 Corner Round Handles on the Stationary Frame */}
-                        <div className="absolute top-0 left-0 -translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
-                        <div className="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
-                        <div className="absolute bottom-0 left-0 -translate-x-1/2 translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
-                        <div className="absolute bottom-0 right-0 translate-x-1/2 translate-y-1/2 w-3.5 h-3.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-md pointer-events-none" />
-
-                        {/* 4 Edge Pill Handles on the Stationary Frame */}
-                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-1.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
-                        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-4 h-1.5 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
-                        <div className="absolute top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
-                        <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-1.5 h-4 bg-white border-2 border-purple-500 rounded-full z-30 shadow-sm pointer-events-none" />
 
                         {/* Floating Quick Action Bar */}
                         <div
-                          className="absolute z-40 flex items-center gap-1.5 bg-slate-900/90 backdrop-blur-md text-white px-2.5 py-1 rounded-full shadow-2xl border border-slate-700/60 pointer-events-auto select-none"
+                          className="absolute z-40 flex items-center gap-2 bg-slate-900/95 backdrop-blur-md text-white px-3 py-1.5 rounded-full shadow-2xl border border-slate-700/80 pointer-events-auto select-none"
                           style={{
-                            left: '50%',
-                            top: 'calc(100% + 10px)',
+                            left: `${cropSession.frame.x + cropSession.frame.width / 2}%`,
+                            top: `calc(${cropSession.frame.y + cropSession.frame.height}% + 12px)`,
                             transform: 'translateX(-50%)',
                           }}
                           onClick={(e) => e.stopPropagation()}
@@ -3227,16 +3570,48 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                           <button
                             type="button"
                             onClick={applyCrop}
-                            className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-600 hover:bg-purple-500 text-[11px] font-semibold text-white transition-colors cursor-pointer shadow"
+                            className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-600 hover:bg-purple-500 text-xs font-semibold text-white transition-colors cursor-pointer shadow"
                             title="Apply crop (Enter)"
                           >
-                            <Check className="w-3 h-3" />
+                            <Check className="w-3.5 h-3.5" />
                             <span>Done</span>
                           </button>
+
+                          {/* Zoom Controls inside Floating Bar */}
+                          <div className="flex items-center gap-1.5 px-2 py-0.5 bg-slate-800/80 rounded-full border border-slate-700/50">
+                            <button
+                              type="button"
+                              onClick={() => setCropZoom(cropZoomPercent - 20)}
+                              className="p-1 rounded-full hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                              title="Decrease / Zoom Out"
+                            >
+                              <ZoomOut className="w-3.5 h-3.5" />
+                            </button>
+                            <input
+                              type="range"
+                              min={100}
+                              max={400}
+                              step={5}
+                              value={cropZoomPercent}
+                              onChange={(e) => setCropZoom(Number(e.target.value))}
+                              className="w-16 accent-purple-500 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+                              title={`Zoom: ${cropZoomPercent}%`}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setCropZoom(cropZoomPercent + 20)}
+                              className="p-1 rounded-full hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                              title="Increase / Zoom In"
+                            >
+                              <ZoomIn className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-[11px] font-mono text-slate-300 w-8 text-center">{cropZoomPercent}%</span>
+                          </div>
+
                           <button
                             type="button"
                             onClick={resetCrop}
-                            className="px-2 py-0.5 rounded-full hover:bg-slate-800 text-[11px] font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
+                            className="px-2.5 py-1 rounded-full hover:bg-slate-800 text-xs font-medium text-slate-300 hover:text-white transition-colors cursor-pointer"
                             title="Reset crop to full image"
                           >
                             Reset
@@ -3244,15 +3619,14 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
                           <button
                             type="button"
                             onClick={cancelCrop}
-                            className="p-1 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                            className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
                             title="Cancel (Esc)"
                           >
-                            <X className="w-3 h-3" />
+                            <X className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
-                    );
-                  })() : (
+                    ) : (
                     <div className="w-full h-full overflow-hidden relative" style={{ borderRadius: `${layer.radius || 0}px` }}>
                       <img
                         src={layer.src}
@@ -3361,6 +3735,7 @@ const CustomDesignEditor = forwardRef<HTMLDivElement, CustomDesignEditorProps>(
               </div>
             )
           )}
+          </div>
 
           {/* Dedicated Selection Overlay: for single selection (z-50) */}
           {selectedIds.length === 1 && selectedLayer && croppingId !== selectedLayer.id && (() => {

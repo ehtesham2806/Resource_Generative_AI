@@ -30,13 +30,14 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PDF Image Extractor API", version="1.0.0")
 
-# Configure CORS
+# Configure CORS - allows localhost and all local network LAN IP connections
 cors_env = os.getenv("CORS_ORIGINS", "http://localhost:5174,http://127.0.0.1:5174")
 allowed_origins = [origin.strip() for origin in cors_env.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins if allowed_origins else ["*"],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
