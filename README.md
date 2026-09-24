@@ -91,8 +91,8 @@ Follow these steps to set up and run the project from scratch on any Windows mac
    # Method A (Recommended - runs through run.py with auto-reload):
    python run.py
 
-   # Method B (Direct Uvicorn command):
-   uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+   # Method B (Direct Python module command - works on any machine/path):
+   python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload
    ```
 
 > 💡 **What is Uvicorn?**  
@@ -234,6 +234,15 @@ All port settings and connection URLs are centralized in the `.env` file at the 
   npm install
   ```
 
+### 5. `Fatal error in launcher: Unable to create process` (Windows Path / Move Issue)
+- **Error:** `Fatal error in launcher: Unable to create process using '"D:\...\venv\Scripts\python.exe" ...': The system cannot find the file specified.`
+- **Cause:** Occurs when the project folder was moved, renamed, or copied from another laptop/directory because Python `.exe` binary wrappers retain hardcoded original paths.
+- **Fix (Immediate):** Run with `python -m` instead of calling `.exe` directly:
+  ```powershell
+  python -m uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+  ```
+- **Fix (Permanent):** Delete `venv` folder and recreate it: `Remove-Item -Recurse -Force .\venv; python -m venv venv; .\venv\Scripts\Activate.ps1; pip install -r requirements.txt`.
+
 ---
 
 ## 📦 Production Build (Windows)
@@ -242,7 +251,7 @@ All port settings and connection URLs are centralized in the `.env` file at the 
 ```powershell
 cd backend
 .\venv\Scripts\Activate.ps1
-uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4
+python -m uvicorn main:app --host 0.0.0.0 --port 8001 --workers 4
 ```
 
 ### Frontend
