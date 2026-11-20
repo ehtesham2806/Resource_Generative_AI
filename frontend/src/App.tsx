@@ -52,8 +52,17 @@ import { API_BASE_URL } from './config';
 import * as htmlToImage from 'html-to-image';
 import { DROPDOWN_OPTIONS } from './utils/brands';
 import { SearchableBrandDropdown } from './components/SearchableBrandDropdown';
+import { OnboardingTour, ONBOARDING_STORAGE_KEY } from './components/OnboardingTour';
 
 function App() {
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const completed = localStorage.getItem(ONBOARDING_STORAGE_KEY);
+      return completed !== 'true';
+    }
+    return false;
+  });
+
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('theme');
@@ -97,7 +106,7 @@ function App() {
   const [error, setError] = useState<string>('');
   const [backendStatus, setBackendStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [objectFit, setObjectFit] = useState<'contain' | 'cover'>('contain');
-  const [activeSidebarTab, setActiveSidebarTab] = useState<'upload' | 'canvas' | 'template'>('upload');
+  const [activeSidebarTab, setActiveSidebarTab] = useState<'upload' | 'template' | 'canvas'>('upload');
   const [templateSearch, setTemplateSearch] = useState<string>('');
   const [templateCategory, setTemplateCategory] = useState<string>('All');
   
@@ -1288,7 +1297,7 @@ function App() {
               )}
             </button>
 
-            <div className="flex items-stretch relative" ref={headerScaleDropdownRef}>
+            <div id="tour-step-export" className="flex items-stretch relative" ref={headerScaleDropdownRef}>
               <button
                 onClick={handleDownload}
                 disabled={isLoading || isDownloading || (!imageUrl && mockupTemplate !== 'custom')}
@@ -1333,11 +1342,12 @@ function App() {
 
       {/* Main Layout Area: Left Sidebar Rail + Active Drawer + Live Preview Canvas */}
       <main className="flex-1 flex w-full overflow-hidden min-h-0">
-        {/* 1. Left Vertical Navigation Rail (Upload -> Canvas -> Template -> Help) */}
+        {/* 1. Left Vertical Navigation Rail (Upload -> Template -> Canvas -> Tour) */}
         <aside className="w-[74px] flex-shrink-0 h-full bg-white/70 dark:bg-[#070712] border-r border-slate-200/80 dark:border-[#1c1c38] flex flex-col items-center justify-between py-5 transition-colors duration-300 z-20 overflow-y-auto">
           <div className="flex flex-col items-center space-y-3 w-full px-2">
             {/* Upload Tab */}
             <button
+              id="tour-nav-upload"
               onClick={() => setActiveSidebarTab('upload')}
               className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
                 activeSidebarTab === 'upload'
@@ -1350,22 +1360,9 @@ function App() {
               <span className="text-[10px] font-medium tracking-tight">Upload</span>
             </button>
 
-            {/* Canvas Tab */}
-            <button
-              onClick={() => setActiveSidebarTab('canvas')}
-              className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
-                activeSidebarTab === 'canvas'
-                  ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] font-bold'
-                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121226]'
-              }`}
-              title="Canvas Settings & Adjust"
-            >
-              <Square className="w-5 h-5 mb-1" />
-              <span className="text-[10px] font-medium tracking-tight">Canvas</span>
-            </button>
-
             {/* Template Tab */}
             <button
+              id="tour-nav-template"
               onClick={() => setActiveSidebarTab('template')}
               className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
                 activeSidebarTab === 'template'
@@ -1377,17 +1374,32 @@ function App() {
               <LayoutGrid className="w-5 h-5 mb-1" />
               <span className="text-[10px] font-medium tracking-tight">Template</span>
             </button>
+
+            {/* Canvas Tab */}
+            <button
+              id="tour-nav-canvas"
+              onClick={() => setActiveSidebarTab('canvas')}
+              className={`w-full flex flex-col items-center justify-center py-2.5 rounded-2xl transition-all ${
+                activeSidebarTab === 'canvas'
+                  ? 'bg-gradient-to-r from-fuchsia-600 via-violet-600 to-purple-600 text-white shadow-[0_4px_16px_rgba(168,85,247,0.3)] font-bold'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#121226]'
+              }`}
+              title="Canvas Settings & Adjust"
+            >
+              <Square className="w-5 h-5 mb-1" />
+              <span className="text-[10px] font-medium tracking-tight">Canvas</span>
+            </button>
           </div>
 
           {/* Bottom Help Button */}
           <div className="w-full px-2">
             <button
-              onClick={() => setActiveSidebarTab('upload')}
-              className="w-full flex flex-col items-center justify-center py-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#121226] rounded-2xl transition-all"
-              title="Help & Shortcuts"
+              onClick={() => setIsOnboardingOpen(true)}
+              className="w-full flex flex-col items-center justify-center py-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-[#121226] rounded-2xl transition-all"
+              title="Interactive Tour Guide"
             >
               <HelpCircle className="w-4 h-4 mb-0.5" />
-              <span className="text-[9px] font-medium">Help</span>
+              <span className="text-[9px] font-medium">Tour</span>
             </button>
           </div>
         </aside>
@@ -1398,17 +1410,17 @@ function App() {
           <div className="flex items-center justify-between pb-2 border-b border-slate-200/60 dark:border-[#1a1a32]">
             <h3 className="text-sm font-bold text-slate-800 dark:text-white capitalize flex items-center font-['Outfit']">
               {activeSidebarTab === 'upload' && <Upload className="w-4 h-4 mr-2 text-brand" />}
-              {activeSidebarTab === 'canvas' && <Square className="w-4 h-4 mr-2 text-brand" />}
               {activeSidebarTab === 'template' && <LayoutGrid className="w-4 h-4 mr-2 text-brand" />}
+              {activeSidebarTab === 'canvas' && <Square className="w-4 h-4 mr-2 text-brand" />}
               {activeSidebarTab === 'upload' && 'Upload File'}
-              {activeSidebarTab === 'canvas' && 'Canvas Settings'}
               {activeSidebarTab === 'template' && 'Templates'}
+              {activeSidebarTab === 'canvas' && 'Canvas Settings'}
             </h3>
           </div>
 
           {/* TAB 1: UPLOAD */}
           {activeSidebarTab === 'upload' && (
-            <div className="flex flex-col gap-5">
+            <div id="tour-panel-upload" className="flex flex-col gap-5">
               {/* Uploader Box */}
               <FileUpload 
                 onFileSelect={handleFileSelect} 
@@ -1634,7 +1646,7 @@ function App() {
             });
 
             return (
-              <div className="flex flex-col gap-4">
+              <div id="tour-panel-template" className="flex flex-col gap-4">
                 {/* Search & Filter Bar */}
                 <div className="relative flex items-center">
                   <Search className="w-4 h-4 absolute left-3 text-slate-400 pointer-events-none" />
@@ -1712,7 +1724,7 @@ function App() {
 
           {/* TAB 3: CANVAS */}
           {activeSidebarTab === 'canvas' && (
-            <div className="flex flex-col gap-4">
+            <div id="tour-panel-canvas" className="flex flex-col gap-4">
               {/* Brand Selector Dropdown */}
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
@@ -2316,7 +2328,7 @@ function App() {
             </div>
           </div>
 
-          <div className="w-full max-w-5xl relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
+          <div id="tour-preview-canvas" className="w-full max-w-5xl relative bg-white/45 dark:bg-[#0c0c1c] border border-slate-200/65 dark:border-[#1c1c38] rounded-3xl p-6 shadow-2xl flex flex-col items-center transition-all duration-300">
               
               {/* Top Canvas Header Controls */}
               <div className="absolute top-4 left-6 right-6 z-20 flex items-center justify-between pointer-events-none">
@@ -3609,6 +3621,12 @@ function App() {
           </div>
         );
       })()}
+      {/* Interactive Tooltip Tour Guide */}
+      <OnboardingTour
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        onTabChange={(tab) => setActiveSidebarTab(tab)}
+      />
     </div>
   );
 }
